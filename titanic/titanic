@@ -1,0 +1,10 @@
+#! /usr/bin/env python
+
+import pandas
+import numpy
+from sklearn.linear_model import LinearRegression
+from sklearn.cross_validation import KFold
+
+titanic = pandas.read_csv("train.csv")
+
+print(titanic.head(5))

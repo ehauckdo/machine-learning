@@ -30,7 +30,7 @@ def get_family_id(row):
 
 def print_info(dataframe):
     print(dataframe.describe())
-    print(dataframe.shape())
+    print(dataframe.shape)
 
 # read csv
 titanic = pandas.read_csv("train.csv")

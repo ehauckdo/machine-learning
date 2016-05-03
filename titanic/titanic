@@ -7,7 +7,7 @@ import operator
 from sklearn.linear_model import LinearRegression
 from sklearn.cross_validation import KFold
 
-# util functions
+# feature generation functions
 def get_title(name):
     title_mapping = {"Mr": 1, "Miss": 2, "Mrs": 3, "Master": 4, "Dr": 5, "Rev": 6, "Major": 7, "Col": 7, "Mlle": 8, "Mme": 8, "Don": 9, "Lady": 10, "Countess": 10, "Jonkheer": 10, "Sir": 9, "Capt": 7, "Ms": 2}
     title_search = re.search('([A-Za-z]+)\.', name)
@@ -28,10 +28,17 @@ def get_family_id(row):
         family_id_mapping[family_id] = current_id
     return family_id_mapping[family_id]
 
+# util functions
 def print_info(dataframe):
     print(dataframe.describe())
     print(dataframe.shape)
 
+def generate_submission(dataframe, predictions):
+    submission = pandas.DataFrame({
+        "PassengerId": dataframe["PassengerId"],
+        "Survived": predictions
+    })
+    submission.to_csv("kaggle.csv", index=False)
 
 # read csv
 titanic = pandas.read_csv("train.csv")

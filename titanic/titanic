@@ -28,6 +28,10 @@ def get_family_id(row):
         family_id_mapping[family_id] = current_id
     return family_id_mapping[family_id]
 
+def print_info(dataframe):
+    print(dataframe.describe())
+    print(dataframe.shape())
+
 # read csv
 titanic = pandas.read_csv("train.csv")
 
@@ -53,6 +57,3 @@ titanic["FamilyId"] = family_ids
 
 print(titanic.head(5))
 print(pandas.value_counts(family_ids))
-
-
-

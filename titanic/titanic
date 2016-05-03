@@ -5,7 +5,11 @@ import numpy
 import re
 import operator
 from sklearn.linear_model import LinearRegression
-from sklearn.cross_validation import KFold
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_selection import SelectKBest, f_classif
+from sklearn import cross_validation
+import matplotlib.pyplot as plt
 
 # feature generation functions
 def get_title(name):
@@ -40,6 +44,18 @@ def generate_submission(dataframe, predictions):
     })
     submission.to_csv("kaggle.csv", index=False)
 
+def feature_selection(dataframe, predictions):
+    selector = SelectKBest(f_classif, k=5)
+    selector.fit(dataframe[predictors], predictions)
+
+    # Get the raw p-values for each feature, and transform from p-values into scores
+    scores = numpy.log10(selector.pvalues_)
+    
+    plt.bar(range(len(predictors)), scores)
+    plt.xticks(range(len(predictors)), predictors, rotation='vertical')
+    plt.show()
+    
+
 # read csv
 titanic = pandas.read_csv("train.csv")
 
@@ -63,4 +79,25 @@ family_ids = titanic.apply(get_family_id, axis=1)
 family_ids[titanic["FamilySize"] < 3] = -1
 titanic["FamilyId"] = family_ids
 
+predictors = ["Pclass", "Sex", "Age", "SibSp", "Parch", "Fare", "Embarked", "FamilySize", "NameLength", "Title", "FamilyId"]
+predictors_new = ["Pclass", "Sex", "Fare", "Title"]
+
+# logistic regression algorithm
+algLR = LogisticRegression(random_state=1)
+scoresLR = cross_validation.cross_val_score(algLR, titanic[predictors], titanic["Survived"], cv=3)
+
+algLR.fit(titanic[predictors], titanic["Survived"])
+predictionsLR = algLR.predict(titanic[predictors])
+
+# random forest algorithm
+algRF = RandomForestClassifier(random_state=1, n_estimators=150, min_samples_split=8, min_samples_leaf=4)
+scoresRF = cross_validation.cross_val_score(algRF, titanic[predictors], titanic["Survived"], cv=3)
+
+algRF.fit(titanic[predictors], titanic["Survived"])
+predictionsRF = algRF.predict(titanic[predictors])
+
+# feature selection
+feature_selection(titanic, titanic["Survived"])
+
+print("LR scores: "+str(scoresLR.mean())+", RF scores:"+str(scoresRF.mean()))
 print(titanic.head(5))

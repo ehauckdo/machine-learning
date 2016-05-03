@@ -15,9 +15,9 @@ def get_title(name):
         return title_mapping[title_search.group(1)]
     return ""
 
+family_id_mapping = {}
+
 def get_family_id(row):
-    # TODO: not really working, fix it later
-    family_id_mapping = {}
     last_name = row["Name"].split(",")[0]
     family_id = "{0}{1}".format(last_name, row["FamilySize"])
     if family_id not in family_id_mapping:
@@ -31,6 +31,7 @@ def get_family_id(row):
 def print_info(dataframe):
     print(dataframe.describe())
     print(dataframe.shape)
+
 
 # read csv
 titanic = pandas.read_csv("train.csv")
@@ -56,4 +57,3 @@ family_ids[titanic["FamilySize"] < 3] = -1
 titanic["FamilyId"] = family_ids
 
 print(titanic.head(5))
-print(pandas.value_counts(family_ids))

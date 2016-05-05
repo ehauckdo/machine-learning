@@ -7,13 +7,14 @@ import operator
 from sklearn.linear_model import LinearRegression
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn import cross_validation
 import matplotlib.pyplot as plt
 
 # feature generation functions
 def get_title(name):
-    title_mapping = {"Mr": 1, "Miss": 2, "Mrs": 3, "Master": 4, "Dr": 5, "Rev": 6, "Major": 7, "Col": 7, "Mlle": 8, "Mme": 8, "Don": 9, "Lady": 10, "Countess": 10, "Jonkheer": 10, "Sir": 9, "Capt": 7, "Ms": 2}
+    title_mapping = {"Mr": 1, "Miss": 2, "Mrs": 3, "Master": 4, "Dr": 5, "Rev": 6, "Major": 7, "Col": 7, "Mlle": 8, "Mme": 8, "Don": 9, "Lady": 10, "Countess": 10, "Jonkheer": 10, "Sir": 9, "Capt": 7, "Ms": 2, "Dona": 10}
     title_search = re.search('([A-Za-z]+)\.', name)
     if title_search:
         return title_mapping[title_search.group(1)]
@@ -55,29 +56,34 @@ def feature_selection(dataframe, predictions):
     plt.xticks(range(len(predictors)), predictors, rotation='vertical')
     plt.show()
     
+def titanic_clean_data(dataframe):
+
+    # fill mising values
+    dataframe["Age"] = dataframe["Age"].fillna(dataframe["Age"].median())
+    dataframe["Fare"] = dataframe["Fare"].fillna(dataframe["Fare"].median())
+    dataframe["Embarked"] = dataframe["Embarked"].fillna("S")
+
+    # change non numeric columns to numeric
+    dataframe.loc[dataframe["Sex"] == "male", "Sex"] = 0
+    dataframe.loc[dataframe["Sex"] == "female", "Sex"] = 1
+    dataframe.loc[dataframe["Embarked"] == "S", "Embarked"] = 0
+    dataframe.loc[dataframe["Embarked"] == "C", "Embarked"] = 1
+    dataframe.loc[dataframe["Embarked"] == "Q", "Embarked"] = 2
+
+    # generating new features
+    dataframe["FamilySize"] = dataframe["SibSp"] + dataframe["Parch"]
+    dataframe["NameLength"] = dataframe["Name"].apply(lambda x: len(x))
+    dataframe["Title"] = dataframe["Name"].apply(get_title)
+    family_ids = dataframe.apply(get_family_id, axis=1)
+    family_ids[dataframe["FamilySize"] < 3] = -1
+    dataframe["FamilyId"] = family_ids
 
 # read csv
 titanic = pandas.read_csv("train.csv")
+test = pandas.read_csv("test.csv")
 
-# fill mising values
-titanic["Age"] = titanic["Age"].fillna(titanic["Age"].median())
-titanic["Fare"] = titanic["Fare"].fillna(titanic["Fare"].median())
-titanic["Embarked"] = titanic["Embarked"].fillna("S")
-
-# change non numeric columns to numeric
-titanic.loc[titanic["Sex"] == "male", "Sex"] = 0
-titanic.loc[titanic["Sex"] == "female", "Sex"] = 1
-titanic.loc[titanic["Embarked"] == "S", "Embarked"] = 0
-titanic.loc[titanic["Embarked"] == "C", "Embarked"] = 1
-titanic.loc[titanic["Embarked"] == "Q", "Embarked"] = 2
-
-# generating new features
-titanic["FamilySize"] = titanic["SibSp"] + titanic["Parch"]
-titanic["NameLength"] = titanic["Name"].apply(lambda x: len(x))
-titanic["Title"] = titanic["Name"].apply(get_title)
-family_ids = titanic.apply(get_family_id, axis=1)
-family_ids[titanic["FamilySize"] < 3] = -1
-titanic["FamilyId"] = family_ids
+titanic_clean_data(titanic)
+titanic_clean_data(test)
 
 predictors = ["Pclass", "Sex", "Age", "SibSp", "Parch", "Fare", "Embarked", "FamilySize", "NameLength", "Title", "FamilyId"]
 predictors_new = ["Pclass", "Sex", "Fare", "Title"]
@@ -85,19 +91,44 @@ predictors_new = ["Pclass", "Sex", "Fare", "Title"]
 # logistic regression algorithm
 algLR = LogisticRegression(random_state=1)
 scoresLR = cross_validation.cross_val_score(algLR, titanic[predictors], titanic["Survived"], cv=3)
-
 algLR.fit(titanic[predictors], titanic["Survived"])
 predictionsLR = algLR.predict(titanic[predictors])
+print("LR scores: "+str(scoresLR.mean()))
 
 # random forest algorithm
-algRF = RandomForestClassifier(random_state=1, n_estimators=150, min_samples_split=8, min_samples_leaf=4)
+algRF = RandomForestClassifier(random_state=1, n_estimators=100, min_samples_split=6, min_samples_leaf=4)
 scoresRF = cross_validation.cross_val_score(algRF, titanic[predictors], titanic["Survived"], cv=3)
-
 algRF.fit(titanic[predictors], titanic["Survived"])
 predictionsRF = algRF.predict(titanic[predictors])
+print("RF scores: "+str(scoresRF.mean()))
 
-# feature selection
-feature_selection(titanic, titanic["Survived"])
+# gradient boosting algorithm
+algGB = GradientBoostingClassifier(random_state=1, n_estimators=30, max_depth=3)
+scoresGB = cross_validation.cross_val_score(algGB, titanic[predictors], titanic["Survived"], cv=3)
+algGB.fit(titanic[predictors], titanic["Survived"])
+predictionsGB = algGB.predict(test[predictors])
+print("GB scores: "+str(scoresGB.mean()))
 
-print("LR scores: "+str(scoresLR.mean())+", RF scores:"+str(scoresRF.mean()))
-print(titanic.head(5))
+algorithms = [
+    [LogisticRegression(random_state=1), ["Pclass", "Sex", "Fare", "FamilySize", "Title", "Embarked"]],
+    [GradientBoostingClassifier(random_state=1, n_estimators=30, max_depth=3), ["Pclass", "Sex", "Age", "Fare", "FamilySize", "Title", "FamilyId", "Embarked"]]
+#    ,[RandomForestClassifier(random_state=1, n_estimators=100, min_samples_split=6, min_samples_leaf=4), ["Pclass", "Sex", "Age", "Fare", "FamilySize", "Title", "FamilyId", "Embarked"]]
+]
+
+total_predictions = []
+for algorithm, predictor in algorithms:
+    algorithm.fit(titanic[predictors], titanic["Survived"])
+    prediction = algorithm.predict_proba(test[predictors].astype(float))[:,1]
+    total_predictions.append(prediction)
+
+# gradient supposedly generates better predictions, so weight it higher
+predictions = ((total_predictions[0] * 1 ) + (total_predictions[1] * 3)) / 4
+
+predictions[predictions <= .5] = 0
+predictions[predictions > .5] = 1
+predictions = predictions.astype(int)
+
+generate_submission(test, predictions)
+
+#print(titanic.head(5))
+

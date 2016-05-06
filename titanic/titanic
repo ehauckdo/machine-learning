@@ -59,6 +59,42 @@ def perform_gradient_boosting(train_set, train_target, test_set, estimators=30, 
     #print("GB scores: "+str(scores.mean()))
     return predictions;
 
+def score_ensemble(algorithms, train_set, train_target):
+    
+    kf = KFold(titanic.shape[0], n_folds = 3, random_state=1)
+
+    predictions = []
+    for train, test in kf:
+
+        full_test_predictions = []
+        for alg, predictors in algorithms:
+
+            fold_train_target = train_target.iloc[train]
+            fold_train_predictors = train_set[predictors].iloc[train,:]
+
+            alg.fit(fold_train_predictors, fold_train_target)
+
+            # predict on the test fold
+            # alg.predict will give the labels of the classified samples (i.e. 0 or 1)
+            # alg.predict_proba will give the probability of a sample belonging to a category (i.e. 0~1)
+            probability_array = alg.predict_proba(train_set[predictors].iloc[test,:].astype(float))
+            # select probabilty of belonging to "Survived = 1"
+            test_predictions = probability_array[:,1] 
+            full_test_predictions.append(test_predictions)
+        
+        test_predictions = (full_test_predictions[0] + full_test_predictions[1]) / 2 
+        test_predictions[test_predictions <= .5] = 0
+        test_predictions[test_predictions > .5] = 1
+        predictions.append(test_predictions)    
+
+    # concatenate the three predicted test folders
+    predictions = numpy.concatenate(predictions, axis=0)
+
+    # Compute accuracy by comparing to the training data.
+    accuracy = sum(predictions[predictions == train_target]) / len(predictions)
+    print(accuracy)
+
+
 # util functions
 def print_info(dataframe):
     print(dataframe.describe())

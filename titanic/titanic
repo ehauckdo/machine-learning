@@ -94,6 +94,21 @@ def score_ensemble(algorithms, train_set, train_target):
     accuracy = sum(predictions[predictions == train_target]) / len(predictions)
     print(accuracy)
 
+def perform_ensemble(algorithms, train_set, train_target, test_set):
+    total_predictions = []
+    for algorithm, predictor in algorithms:
+
+        algorithm.fit(train_set[predictors], train_target)
+        prediction = algorithm.predict_proba(test_set[predictors].astype(float))[:,1]
+        total_predictions.append(prediction)
+
+    # gradient supposedly generates better predictions, so weight it higher
+    predictions = ((total_predictions[0] * 1 ) + (total_predictions[1] * 3)) / 4
+
+    predictions[predictions <= .5] = 0
+    predictions[predictions > .5] = 1
+    predictions = predictions.astype(int)
+    return predictions
 
 # util functions
 def print_info(dataframe):
@@ -160,17 +175,5 @@ algorithms = [
     #,[RandomForestClassifier(random_state=1, n_estimators=150, min_samples_split=4, min_samples_leaf=3), ["Pclass", "Sex", "Age", "Fare", "FamilySize", "Title", "FamilyId", "Embarked"]]
 ]
 
-total_predictions = []
-for algorithm, predictor in algorithms:
-    algorithm.fit(titanic[predictors], titanic["Survived"])
-    prediction = algorithm.predict_proba(test[predictors].astype(float))[:,1]
-    total_predictions.append(prediction)
-
-# gradient supposedly generates better predictions, so weight it higher
-predictions = ((total_predictions[0] * 1 ) + (total_predictions[1] * 3)) / 4
-
-predictions[predictions <= .5] = 0
-predictions[predictions > .5] = 1
-predictions = predictions.astype(int)
-
+predictions = perform_ensemble(algorithms, titanic, titanic["Survived"], test)
 generate_submission(test, predictions)

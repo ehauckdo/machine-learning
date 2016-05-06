@@ -40,19 +40,19 @@ def perform_logistic_regression(train_set, train_target, test_set):
     alg.fit(train_set[predictors], train_target)
     predictions = alg.predict(test_set[predictors])
     #scores = cross_validation.cross_val_score(alg, train_set[predictors], train_target, cv=3)
-    #print("LR scores2: "+str(scoresLR.mean()))
+    #print("LR scores: "+str(scores.mean()))
     return predictions
 
-def perform_random_forest(train_set, train_target, test_set):
-    alg = RandomForestClassifier(random_state=1, n_estimators=100, min_samples_split=6, min_samples_leaf=4)
+def perform_random_forest(train_set, train_target, test_set, estimators=100, splits=6, leafs=4):
+    alg = RandomForestClassifier(random_state=1, n_estimators=estimators, min_samples_split=splits, min_samples_leaf=leafs)
     alg.fit(train_set[predictors], train_target)
     predictions = alg.predict(test_set[predictors])
     #scores = cross_validation.cross_val_score(alg, train_set[predictors], train_target, cv=3)
-    #print("RF scores: "+str(scoresRF.mean()))
+    #print("RF scores: "+str(scores.mean()))
     return predictions;
 
-def perform_gradient_boosting(train_set, train_target, test_set):
-    alg = GradientBoostingClassifier(random_state=1, n_estimators=30, max_depth=3)
+def perform_gradient_boosting(train_set, train_target, test_set, estimators=30, depth=3):
+    alg = GradientBoostingClassifier(random_state=1, n_estimators=estimators, max_depth=depth)
     alg.fit(train_set[predictors], train_target)
     predictions = alg.predict(test_set[predictors])
     #scores = cross_validation.cross_val_score(alg, train_set[predictors], train_target, cv=3)
@@ -138,4 +138,3 @@ predictions[predictions > .5] = 1
 predictions = predictions.astype(int)
 
 generate_submission(test, predictions)
-

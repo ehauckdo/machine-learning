@@ -43,11 +43,11 @@ def perform_logistic_regression(train_set, train_target, test_set):
     #print("LR scores: "+str(scores.mean()))
     return predictions
 
-def perform_random_forest(train_set, train_target, test_set, estimators=100, splits=6, leafs=4):
+def perform_random_forest(train_set, train_target, test_set, estimators=178, splits=6, leafs=4):
     alg = RandomForestClassifier(random_state=1, n_estimators=estimators, min_samples_split=splits, min_samples_leaf=leafs)
     alg.fit(train_set[predictors], train_target)
     predictions = alg.predict(test_set[predictors])
-    #scores = cross_validation.cross_val_score(alg, train_set[predictors], train_target, cv=3)
+    #scores = cross_validation.cross_val_score(alg, train_set[predictors_new], train_target, cv=3)
     #print("RF scores: "+str(scores.mean()))
     return predictions;
 
@@ -165,9 +165,9 @@ titanic_clean_data(test)
 predictors = ["Pclass", "Sex", "Age", "SibSp", "Parch", "Fare", "Embarked", "FamilySize", "NameLength", "Title", "FamilyId"]
 predictors_new = ["Pclass", "Sex", "Fare", "Title"]
 
-#perform_logistic_regression(titanic, titanic["Survived"], test)
-#perform_random_forest(titanic, titanic["Survived"], test)
-#perform_gradient_boosting(titanic, titanic["Survived"], test)
+#predictions = perform_logistic_regression(titanic, titanic["Survived"], test)
+#predictions = perform_random_forest(titanic, titanic["Survived"], test)
+#predictions = perform_gradient_boosting(titanic, titanic["Survived"], test)
 
 algorithms = [
     [LogisticRegression(random_state=1), ["Pclass", "Sex", "Fare", "FamilySize", "Title", "Age" ,"Embarked"]],
@@ -175,5 +175,6 @@ algorithms = [
     #,[RandomForestClassifier(random_state=1, n_estimators=150, min_samples_split=4, min_samples_leaf=3), ["Pclass", "Sex", "Age", "Fare", "FamilySize", "Title", "FamilyId", "Embarked"]]
 ]
 
-predictions = perform_ensemble(algorithms, titanic, titanic["Survived"], test)
-generate_submission(test, predictions)
+#feature_selection(titanic[predictors], titanic["Survived"])
+#predictions = perform_ensemble(algorithms, titanic, titanic["Survived"], test)
+#generate_submission(test, predictions)

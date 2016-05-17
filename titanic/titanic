@@ -169,18 +169,17 @@ def titanic_clean_data(dataframe):
     family_ids[dataframe["FamilySize"] < 3] = -1
     dataframe["FamilyId"] = family_ids
 
+    # we assume that generally, if cabin info is present, the person survived
     dataframe["Cabin"] = dataframe["Cabin"].fillna(0)
     dataframe.loc[dataframe["Cabin"] != 0, "Cabin"] = 1
 
     # drop unnecesesary columns, won't be helpful in analysis and prediction
     dataframe = dataframe.drop(['Name', 'Ticket'], axis=1)
     
-    # discretize family size
+    # discretize family size (small families are more likely to survived)
     dataframe.loc[dataframe["FamilySize"] == 1, "FamilySize"] = -1
     dataframe.loc[dataframe["FamilySize"] > 5, "FamilySize"] = 0
     dataframe.loc[dataframe["FamilySize"] > 0, "FamilySize"] = 1
-
-    #dataframe.loc[type(dataframe["Cabin"]) is str , "Cabin"] = 1
 
 # read csv
 titanic = pandas.read_csv("train.csv")
@@ -192,13 +191,12 @@ test = pandas.read_csv("test.csv")
 
 titanic_clean_data(titanic)
 titanic_clean_data(test)
-#print(titanic.head(6))
  
 predictors = ["Pclass", "Sex", "Age", "Cabin", "SibSp", "Parch", "Fare", "Embarked", "FamilySize",  "Title", "FamilyId"]
 #predictors = ["Pclass", "Sex", "Title","Fare", "Embarked", "FamilyId"]
 
 algorithms = [
-    [GradientBoostingClassifier(random_state=1, n_estimators=35, max_depth=3), ["Pclass", "Sex", "Cabin", "Age", "Fare", "FamilySize", "Title", "FamilyId"]]
+    [GradientBoostingClassifier(random_state=1, n_estimators=35, max_depth=3), ["Pclass", "Sex", "Age", "Fare", "FamilySize", "Title", "FamilyId"]]
     #,[RandomForestClassifier(random_state=1, n_estimators=150, min_samples_split=4, min_samples_leaf=3), ["Pclass", "Sex", "Age", "Fare", "FamilySize", "Title", "FamilyId", "Embarked"]]
     #,[LogisticRegression(random_state=1), ["Pclass", "Sex", "Fare", "FamilySize", "Title", "Age" ,"Embarked"]]
     ,[SVC(probability=True), ["Pclass", "Sex", "Title", "Fare"]]

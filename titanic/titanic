@@ -94,7 +94,8 @@ def score_ensemble(algorithms, train_set, train_target):
             test_predictions = probability_array[:,1] 
             full_test_predictions.append(test_predictions)
         
-        test_predictions = (full_test_predictions[0]*1 + full_test_predictions[1]*1) / 2 
+        test_predictions = (full_test_predictions[0]*3 + full_test_predictions[1]*1) / 4 
+        #test_predictions = (full_test_predictions[0]*2 + full_test_predictions[1]*1 + full_test_predictions[2]*1) / 4 
         test_predictions[test_predictions <= .5] = 0
         test_predictions[test_predictions > .5] = 1
         predictions.append(test_predictions)    
@@ -115,7 +116,8 @@ def perform_ensemble(algorithms, train_set, train_target, test_set):
         total_predictions.append(prediction)
 
     # gradient supposedly generates better predictions, so weight it higher
-    predictions = ((total_predictions[0] * 3 ) + (total_predictions[1] * 1)) / 4
+    predictions = ((total_predictions[0] * 3 ) + (total_predictions[1] * 1) )/ 4
+    #predictions = ((total_predictions[0] * 2 ) + (total_predictions[1] * 1) + (total_predictions[2]*1) )/ 4
 
     predictions[predictions <= .5] = 0
     predictions[predictions > .5] = 1
@@ -148,6 +150,7 @@ def feature_selection(dataframe, predictions):
 def titanic_clean_data(dataframe):
 
     # fill mising values
+    dataframe["Age"] = dataframe["Age"].dropna()
     dataframe["Age"] = dataframe["Age"].fillna(dataframe["Age"].median())
     dataframe["Fare"] = dataframe["Fare"].fillna(dataframe["Fare"].median())
     dataframe["Embarked"] = dataframe["Embarked"].fillna("S")
@@ -166,8 +169,18 @@ def titanic_clean_data(dataframe):
     family_ids[dataframe["FamilySize"] < 3] = -1
     dataframe["FamilyId"] = family_ids
 
+    dataframe["Cabin"] = dataframe["Cabin"].fillna(0)
+    dataframe.loc[dataframe["Cabin"] != 0, "Cabin"] = 1
+
     # drop unnecesesary columns, won't be helpful in analysis and prediction
     dataframe = dataframe.drop(['Name', 'Ticket'], axis=1)
+    
+    # discretize family size
+    dataframe.loc[dataframe["FamilySize"] == 1, "FamilySize"] = -1
+    dataframe.loc[dataframe["FamilySize"] > 5, "FamilySize"] = 0
+    dataframe.loc[dataframe["FamilySize"] > 0, "FamilySize"] = 1
+
+    #dataframe.loc[type(dataframe["Cabin"]) is str , "Cabin"] = 1
 
 # read csv
 titanic = pandas.read_csv("train.csv")
@@ -179,15 +192,16 @@ test = pandas.read_csv("test.csv")
 
 titanic_clean_data(titanic)
 titanic_clean_data(test)
-
-#predictors = ["Pclass", "Sex", "Age", "SibSp", "Parch", "Fare", "Embarked", "FamilySize",  "Title", "FamilyId"]
-predictors = ["Pclass", "Sex", "Title","Fare", "Embarked"]
+#print(titanic.head(6))
+ 
+predictors = ["Pclass", "Sex", "Age", "Cabin", "SibSp", "Parch", "Fare", "Embarked", "FamilySize",  "Title", "FamilyId"]
+#predictors = ["Pclass", "Sex", "Title","Fare", "Embarked", "FamilyId"]
 
 algorithms = [
-    #[LogisticRegression(random_state=1), ["Pclass", "Sex", "Fare", "FamilySize", "Title", "Age" ,"Embarked"]],
-    #[GradientBoostingClassifier(random_state=1, n_estimators=35, max_depth=3), ["Pclass", "Sex", "Age", "Fare", "FamilySize", "Title", "FamilyId", "Embarked"]]
-    [RandomForestClassifier(random_state=1, n_estimators=150, min_samples_split=4, min_samples_leaf=3), ["Pclass", "Sex", "Age", "Fare", "FamilySize", "Title", "FamilyId", "Embarked"]]
-    ,[SVC(probability=True), ["Pclass", "Sex", "Title", "Fare", "Embarked"]]
+    [GradientBoostingClassifier(random_state=1, n_estimators=35, max_depth=3), ["Pclass", "Sex", "Cabin", "Age", "Fare", "FamilySize", "Title", "FamilyId"]]
+    #,[RandomForestClassifier(random_state=1, n_estimators=150, min_samples_split=4, min_samples_leaf=3), ["Pclass", "Sex", "Age", "Fare", "FamilySize", "Title", "FamilyId", "Embarked"]]
+    #,[LogisticRegression(random_state=1), ["Pclass", "Sex", "Fare", "FamilySize", "Title", "Age" ,"Embarked"]]
+    ,[SVC(probability=True), ["Pclass", "Sex", "Title", "Fare"]]
 ]
 
 #predictions = perform_logistic_regression(titanic, titanic["Survived"], test)
@@ -198,5 +212,5 @@ algorithms = [
 
 
 #feature_selection(titanic[predictors], titanic["Survived"])
-#predictions = perform_ensemble(algorithms, titanic, titanic["Survived"], test)
-#generate_submission(test, predictions)
+predictions = perform_ensemble(algorithms, titanic, titanic["Survived"], test)
+generate_submission(test, predictions)

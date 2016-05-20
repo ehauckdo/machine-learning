@@ -111,8 +111,8 @@ def perform_ensemble(algorithms, train_set, train_target, test_set):
     total_predictions = []
     for algorithm, predictor in algorithms:
 
-        algorithm.fit(train_set[predictor], train_target)
-        prediction = algorithm.predict_proba(test_set[predictor].astype(float))[:,1]
+        algorithm.fit(train_set[predictors], train_target)
+        prediction = algorithm.predict_proba(test_set[predictors].astype(float))[:,1]
         total_predictions.append(prediction)
 
     # gradient supposedly generates better predictions, so weight it higher
@@ -149,11 +149,38 @@ def feature_selection(dataframe, predictions):
     
 def titanic_clean_data(dataframe):
 
+    def fill_missing_age(passenger):
+        title, age, Id = passenger
+        if numpy.isnan(age):
+            # Masters receive age 2
+            if title == 4:
+                return 7 
+            # Misters receive age 30
+            if title == 1:
+                return 28 
+            # Miss receive age 21
+            if title == 2:
+                return 8 
+            if title == 3:
+                return 36
+            # The rest receives age 20
+            else:
+                return 30 
+        else:
+            return age
+
+        # Masters receive age 2
+        #dataframe.loc[dataframe["Title"] == 4 and pandas.isnull(dataframe["Age"]), "Age"] = 2
+        #nulls = numpy.where(dataframe["Age"].isnull())[0]
+        #for index in nulls:
+        #    d = dataframe.iloc[[index]]
+        #    print(d['Name'])
+
     # fill mising values
-    dataframe["Age"] = dataframe["Age"].dropna()
+    #dataframe["Age"] = dataframe["Age"].dropna()
     dataframe["Age"] = dataframe["Age"].fillna(dataframe["Age"].median())
     dataframe["Fare"] = dataframe["Fare"].fillna(dataframe["Fare"].median())
-    dataframe["Embarked"] = dataframe["Embarked"].fillna("S")
+    dataframe["Embarked"] = dataframe["Embarked"].fillna("C")
 
     # change non numeric columns to numeric
     dataframe.loc[dataframe["Sex"] == "male", "Sex"] = 0
@@ -181,9 +208,16 @@ def titanic_clean_data(dataframe):
     family_ids[dataframe["FamilySize"] < 3] = -1
     dataframe["FamilyId"] = family_ids
 
+    #dataframe["Age"] = dataframe[["Title", "Age", "PassengerId"]].apply(fill_missing_age, axis=1)
+    #dataframe["Age"] = dataframe["Age"].astype(int)
+    #print("Median of All Ages:")
+    #print(dataframe["Age"].median())
+    #print("Median of Ages of Title 3:")
+    #print(dataframe.loc[dataframe["Title"] == 1]["Age"].median())
+    
     # we assume that generally, if cabin info is present, the person survived
-    dataframe["Cabin"] = dataframe["Cabin"].fillna(0)
-    dataframe.loc[dataframe["Cabin"] != 0, "Cabin"] = 1
+    #dataframe["Cabin"] = dataframe["Cabin"].fillna(0)
+    #dataframe.loc[dataframe["Cabin"] != 0, "Cabin"] = 1
 
     # drop unnecesesary columns, won't be helpful in analysis and prediction
     dataframe = dataframe.drop(['Name', 'Ticket'], axis=1)
@@ -201,14 +235,16 @@ test = pandas.read_csv("test.csv")
 titanic_clean_data(titanic)
 titanic_clean_data(test)
 
+#titanic.to_csv("train_master_age.csv", index=False)
+
 #predictors = ["Pclass", "Person", "Age", "Cabin", "SibSp", "Parch", "Fare", "Embarked", "FamilySize",  "Title", "FamilyId"]
-predictors = ["Cabin", "Pclass", "Person", "Title","Fare", "Embarked", "FamilyId"]
+predictors = ["Pclass", "Person", "Title","Fare", "Embarked", "FamilyId"]
 
 algorithms = [
-    [GradientBoostingClassifier(random_state=1, n_estimators=35, max_depth=3), ["Pclass", "Person", "Fare", "Embarked", "Title", "FamilyId"]]
-    ,[RandomForestClassifier(random_state=1, n_estimators=150, min_samples_split=4, min_samples_leaf=3), ["Pclass", "Person", "Age", "Fare", "FamilySize", "Title", "FamilyId", "Embarked"]]
+    [GradientBoostingClassifier(random_state=1, n_estimators=35, max_depth=3), ["Pclass",  "Person", "Fare", "Embarked", "Title", "FamilyId"]]
+    #,[RandomForestClassifier(random_state=1, n_estimators=150, min_samples_split=4, min_samples_leaf=3), ["Pclass", "Person", "Age", "Fare", "FamilySize", "Title", "FamilyId", "Embarked"]]
     #,[LogisticRegression(random_state=1), ["Pclass", "Person", "Fare", "Title"]]
-    #,[SVC(probability=True), ["Pclass", "Person", "Title", "Fare", "Embarked", "FamilyId" ]]
+    ,[SVC(probability=True), ["Pclass", "Person", "Title", "Fare" ]]
 ]
 
 #predictions = perform_logistic_regression(titanic, titanic["Survived"], test)

@@ -9,10 +9,13 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.svm import SVC
+from sklearn.svm import NuSVC
+from sklearn.svm import LinearSVC
 from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.cross_validation import KFold
 from sklearn import cross_validation
 from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
 import seaborn as sns
 sns.set_style('whitegrid')
 import matplotlib.pyplot as plt
@@ -39,7 +42,7 @@ def get_family_id(row):
     return family_id_mapping[family_id]
 
 # algorithms
-def perform_logistic_regression(train_set, train_target, test_set):
+def perform_logistic_regression(train_set, train_target, test_set, predictors):
     alg = LogisticRegression(random_state=1)
     alg.fit(train_set[predictors], train_target)
     predictions = alg.predict(test_set[predictors])
@@ -47,7 +50,7 @@ def perform_logistic_regression(train_set, train_target, test_set):
     print("LR scores: "+str(scores.mean()))
     return predictions
 
-def perform_random_forest(train_set, train_target, test_set, estimators=178, splits=6, leafs=4):
+def perform_random_forest(train_set, train_target, test_set, predictors, estimators=178, splits=6, leafs=4):
     alg = RandomForestClassifier(random_state=1, n_estimators=estimators, min_samples_split=splits, min_samples_leaf=leafs)
     alg.fit(train_set[predictors], train_target)
     predictions = alg.predict(test_set[predictors])
@@ -55,7 +58,7 @@ def perform_random_forest(train_set, train_target, test_set, estimators=178, spl
     print("RF scores: "+str(scores.mean()))
     return predictions;
 
-def perform_gradient_boosting(train_set, train_target, test_set, estimators=30, depth=3):
+def perform_gradient_boosting(train_set, train_target, test_set, predictors, estimators=30, depth=3):
     alg = GradientBoostingClassifier(random_state=1, n_estimators=estimators, max_depth=depth)
     alg.fit(train_set[predictors], train_target)
     predictions = alg.predict(test_set[predictors])
@@ -64,7 +67,7 @@ def perform_gradient_boosting(train_set, train_target, test_set, estimators=30, 
     return predictions;
 
 
-def perform_SVM(train_set, train_target, test_set):
+def perform_SVM(train_set, train_target, test_set, predictors):
     alg = SVC()
     alg.fit(train_set[predictors], train_target)
     predictions = alg.predict(test_set[predictors])
@@ -95,7 +98,7 @@ def score_ensemble(algorithms, train_set, train_target):
             test_predictions = probability_array[:,1] 
             full_test_predictions.append(test_predictions)
         
-        test_predictions = (full_test_predictions[0]*3 + full_test_predictions[1]*1) / 4 
+        test_predictions = (full_test_predictions[0]*1 + full_test_predictions[1]*1) / 2 
         #test_predictions = (full_test_predictions[0]*2 + full_test_predictions[1]*1 + full_test_predictions[2]*1) / 4 
         test_predictions[test_predictions <= .5] = 0
         test_predictions[test_predictions > .5] = 1
@@ -117,7 +120,7 @@ def perform_ensemble(algorithms, train_set, train_target, test_set):
         total_predictions.append(prediction)
 
     # gradient supposedly generates better predictions, so weight it higher
-    predictions = ((total_predictions[0] * 3 ) + (total_predictions[1] * 1) )/ 4
+    predictions = ((total_predictions[0] * 1 ) + (total_predictions[1] * 1) )/ 2
     #predictions = ((total_predictions[0] * 2 ) + (total_predictions[1] * 1) + (total_predictions[2]*1) )/ 4
 
     predictions[predictions <= .5] = 0
@@ -150,7 +153,6 @@ def feature_selection(dataframe, predictions):
     
 def titanic_clean_data(dataframe):
 
-
     # generating new features
     dataframe["FamilySize"] = dataframe["SibSp"] + dataframe["Parch"]
     dataframe["Title"] = dataframe["Name"].apply(get_title)
@@ -163,62 +165,41 @@ def titanic_clean_data(dataframe):
     dataframe.loc[dataframe["FamilySize"] > 4, "FamilySize"] = 0
     dataframe.loc[dataframe["FamilySize"] > 0, "FamilySize"] = 1
     
-    # prototype, don't use this yet
-    def fill_missing_age(passenger):
-        title, age, Id = passenger
-        if numpy.isnan(age):
-            # Masters receive age 2
-            if title == 4:
-                return 6 
-            # Misters receive age 30
-            #if title == 1:
-            #    return 28 
-            # Miss receive age 21
-            #if title == 2:
-            #    return 8 
-            #if title == 3:
-            #    return 36
-            # The rest receives age 20
-            else:
-                return age 
-        else:
-            return age
-
     # fill mising values
-    #dataframe["Age"] = dataframe["Age"].dropna()
     #dataframe["Age"] = dataframe[["Title", "Age", "PassengerId"]].apply(fill_missing_age, axis=1)
     #dataframe["Age"] = dataframe["Age"].astype(int)
+    #def fill_missing_age(passenger):
+    #    title, age, Id = passenger
+    #    if numpy.isnan(age):
+    #        # Masters receive age 2
+    #        if title == 4:
+    #            return 6 
+    #        else:
+    #            return age 
+    #    else:
+    #        return age
+
+    # fill empty values
     dataframe["Age"] = dataframe["Age"].fillna(dataframe["Age"].median())
     dataframe["Fare"] = dataframe["Fare"].fillna(dataframe["Fare"].median())
     dataframe["Embarked"] = dataframe["Embarked"].fillna("C")
 
-    #dataframe["Fare"] = preprocessing.scale(dataframe["Fare"])[0]
-
-    def get_cabin(passenger):
-        cabin, age = passenger
-        try:
-            if numpy.isnan(cabin):
-                return 8
-        except:
-            if cabin.startswith("A"):
-                return 1
-            elif cabin.startswith("B"):
-                return 2
-            elif cabin.startswith("C"):
-                return 3
-            elif cabin.startswith("D"):
-                return 4
-            elif cabin.startswith("E"):
-                return 5
-            elif cabin.startswith("F"):
-                return 6
-            elif cabin.startswith("G"):
-                return 7
-            else:
-                return 8 
-
-    dataframe["Cabin"] = dataframe[["Cabin", "Age"]].apply(get_cabin, axis=1)
-
+    # discretize cabin values
+    #dataframe["Cabin"] = dataframe[["Cabin", "Age"]].apply(get_cabin, axis=1)
+    #def get_cabin(passenger):
+    #    cabin, age = passenger
+    #    try:
+    #        if numpy.isnan(cabin):
+    #            return 8
+    #    except:
+    #        if   cabin.startswith("A"): return 1
+    #        elif cabin.startswith("B"): return 2
+    #        elif cabin.startswith("C"): return 3
+    #        elif cabin.startswith("D"): return 4
+    #        elif cabin.startswith("E"): return 5
+    #        elif cabin.startswith("F"): return 6
+    #        elif cabin.startswith("G"): return 7
+    #        else: return 8 
 
     # change non numeric columns to numeric
     dataframe.loc[dataframe["Sex"] == "male", "Sex"] = 0
@@ -227,49 +208,36 @@ def titanic_clean_data(dataframe):
     dataframe.loc[dataframe["Embarked"] == "C", "Embarked"] = 1
     dataframe.loc[dataframe["Embarked"] == "Q", "Embarked"] = 2
 
+    # we want to separate people between women - men - children
     def get_type_person(passenger):
         age, sex, kids, title = passenger
-        if age < 16:
-            return 3
-        else:
-            return sex
+        if age < 16: return 3
+        else: return sex
     
+    dataframe["Person"] = dataframe[['Age', 'Sex', "Parch", "Title"]].apply(get_type_person, axis=1)
+    
+    # we want to know who is a mother and who is not
     def get_mother(passenger):
         age, sex, kids, title = passenger
     
         if age > 18 and sex == 1 and kids > 0 and title != 2:
             return 1
-        else:
-            return 0
+        else: return 0
     
     dataframe["Mother"] = dataframe[['Age', 'Sex', 'Parch', 'Title']].apply(get_mother, axis=1)
-    #mothers = dataframe[(dataframe["Sex"] == 1) & (dataframe["Age"] > 18) & (dataframe["Parch"] > 0) & (dataframe["Title"] != 2)]
-    #print(mothers)
-    
-    # we want to separate people between women - men - children
-    dataframe["Person"] = dataframe[['Age', 'Sex', "Parch", "Title"]].apply(get_type_person, axis=1)
-    # we can now drop sex column and use Person column instead
-    dataframe.drop(['Sex'], axis=1, inplace = True)
 
-
-
-    #print("Median of All Ages:")
-    #print(dataframe["Age"].median())
-    #print("Median of Ages of Title 3:")
-    #print(dataframe.loc[dataframe["Title"] == 1]["Age"].median())
-    
-    # we assume that generally, if cabin info is present, the person survived
-    #dataframe["Cabin"] = dataframe["Cabin"].fillna(0)
-    #dataframe.loc[dataframe["Cabin"] != 0, "Cabin"] = 1
-
-    # drop unnecesesary columns, won't be helpful in analysis and prediction
-    dataframe = dataframe.drop(['Name', 'Ticket'], axis=1)
-    
+    # scaling seems interesting but don't seem to yield good results
+    # for tree based methods
+    #minmax_scaler = MinMaxScaler()
+    #std_scaler = StandardScaler()
+    #dataframe["Age"] = minmax_scaler.fit_transform(dataframe["Age"])
+    #dataframe["Fare"] = minmax_scaler.fit_transform(dataframe["Fare"])
+    #dataframe["Age"] = std_scaler.fit_transform(dataframe["Age"])
+    #dataframe["Fare"] = std_scaler.fit_transform(dataframe["Fare"])
 
 # read csv
 titanic = pandas.read_csv("train.csv")
 test = pandas.read_csv("test.csv")
-
 
 titanic_clean_data(titanic)
 titanic_clean_data(test)
@@ -279,16 +247,12 @@ titanic.to_csv("train_master_age.csv", index=False)
 predictors = ["Pclass", "Person", "Title","Fare", "Embarked", "FamilyId"]
 
 algorithms = [
-    [GradientBoostingClassifier(random_state=1, n_estimators=35, max_depth=3), ["Pclass", "Person", "Title","Fare", "Embarked", "FamilyId"]]
-    ,[SVC(probability=True), ["Pclass", "Person", "Title","Fare", "Embarked", "FamilyId"]]
-    #,[RandomForestClassifier(random_state=1, n_estimators=150, min_samples_split=4, min_samples_leaf=3), ["Pclass", "Person", "Age", "Fare", "FamilySize", "Title", "FamilyId", "Embarked"]]
+     [GradientBoostingClassifier(random_state=1, n_estimators=35, max_depth=3), ["Pclass", "Person", "Title", "Fare", "Embarked", "FamilyId", "FamilySize"]] 
+    ,[RandomForestClassifier(random_state=1, n_estimators=150, min_samples_split=4, min_samples_leaf=3), ["Pclass", "Person", "Title", "Fare", "Embarked", "FamilyId", "FamilySize"]]
+    #,[SVC(probability=True), ["Pclass", "Person", "Title","Fare", "Embarked", "FamilyId", "FamilySize"]] 
     #,[LogisticRegression(random_state=1), ["Pclass", "Person", "Fare", "Title"]]
 ]
 
-#predictions = perform_logistic_regression(titanic, titanic["Survived"], test)
-#predictions = perform_random_forest(titanic, titanic["Survived"], test)
-#predictions = perform_gradient_boosting(titanic, titanic["Survived"], test)
-#predictions = perform_SVM(titanic, titanic["Survived"], test)
 score_ensemble(algorithms, titanic, titanic["Survived"])
 
 #feature_selection(titanic[predictors], titanic["Survived"])

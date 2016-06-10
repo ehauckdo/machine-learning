@@ -16,8 +16,6 @@ from sklearn.cross_validation import KFold
 from sklearn import cross_validation
 from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import MinMaxScaler
-import seaborn as sns
-sns.set_style('whitegrid')
 import matplotlib.pyplot as plt
 
 # feature generation functions
@@ -40,6 +38,18 @@ def get_family_id(row):
             current_id = (max(family_id_mapping.items(), key=operator.itemgetter(1))[1] + 1)
         family_id_mapping[family_id] = current_id
     return family_id_mapping[family_id]
+
+# generate chart with correlation feature vs result
+def feature_selection(dataframe, predictions):
+    selector = SelectKBest(f_classif, k=5)
+    selector.fit(dataframe[predictors], predictions)
+
+    # Get the raw p-values for each feature, and transform from p-values into scores
+    scores = numpy.log10(selector.pvalues_)
+    
+    plt.bar(range(len(predictors)), scores)
+    plt.xticks(range(len(predictors)), predictors, rotation='vertical')
+    plt.show()
 
 # algorithms
 def perform_logistic_regression(train_set, train_target, test_set, predictors):
@@ -75,6 +85,7 @@ def perform_SVM(train_set, train_target, test_set, predictors):
     print("SVM scores: "+str(scores.mean()))
     return predictions
 
+# ensemble functions
 def score_ensemble(algorithms, train_set, train_target):
     
     kf = KFold(titanic.shape[0], n_folds = 3, random_state=1)
@@ -99,7 +110,6 @@ def score_ensemble(algorithms, train_set, train_target):
             full_test_predictions.append(test_predictions)
         
         test_predictions = (full_test_predictions[0]*1 + full_test_predictions[1]*1) / 2 
-        #test_predictions = (full_test_predictions[0]*2 + full_test_predictions[1]*1 + full_test_predictions[2]*1) / 4 
         test_predictions[test_predictions <= .5] = 0
         test_predictions[test_predictions > .5] = 1
         predictions.append(test_predictions)    
@@ -119,9 +129,8 @@ def perform_ensemble(algorithms, train_set, train_target, test_set):
         prediction = algorithm.predict_proba(test_set[predictor].astype(float))[:,1]
         total_predictions.append(prediction)
 
-    # gradient supposedly generates better predictions, so weight it higher
-    predictions = ((total_predictions[0] * 1 ) + (total_predictions[1] * 1) )/ 2
-    #predictions = ((total_predictions[0] * 2 ) + (total_predictions[1] * 1) + (total_predictions[2]*1) )/ 4
+    # average scores 
+    predictions = (total_predictions[0]*1  + total_predictions[1]*1)/ 2
 
     predictions[predictions <= .5] = 0
     predictions[predictions > .5] = 1
@@ -140,16 +149,6 @@ def generate_submission(dataframe, predictions):
     })
     submission.to_csv("kaggle.csv", index=False)
 
-def feature_selection(dataframe, predictions):
-    selector = SelectKBest(f_classif, k=5)
-    selector.fit(dataframe[predictors], predictions)
-
-    # Get the raw p-values for each feature, and transform from p-values into scores
-    scores = numpy.log10(selector.pvalues_)
-    
-    plt.bar(range(len(predictors)), scores)
-    plt.xticks(range(len(predictors)), predictors, rotation='vertical')
-    plt.show()
     
 def titanic_clean_data(dataframe):
 
@@ -165,7 +164,8 @@ def titanic_clean_data(dataframe):
     dataframe.loc[dataframe["FamilySize"] > 4, "FamilySize"] = 0
     dataframe.loc[dataframe["FamilySize"] > 0, "FamilySize"] = 1
     
-    # fill mising values
+    # fill mising values with averages or medians from titles
+    # doesn't give a better result than the median
     #dataframe["Age"] = dataframe[["Title", "Age", "PassengerId"]].apply(fill_missing_age, axis=1)
     #dataframe["Age"] = dataframe["Age"].astype(int)
     #def fill_missing_age(passenger):
@@ -185,6 +185,7 @@ def titanic_clean_data(dataframe):
     dataframe["Embarked"] = dataframe["Embarked"].fillna("C")
 
     # discretize cabin values
+    # doesn't give a better result using this feature
     #dataframe["Cabin"] = dataframe[["Cabin", "Age"]].apply(get_cabin, axis=1)
     #def get_cabin(passenger):
     #    cabin, age = passenger
@@ -210,21 +211,22 @@ def titanic_clean_data(dataframe):
 
     # we want to separate people between women - men - children
     def get_type_person(passenger):
-        age, sex, kids, title = passenger
+        age, sex = passenger
         if age < 16: return 3
         else: return sex
     
-    dataframe["Person"] = dataframe[['Age', 'Sex', "Parch", "Title"]].apply(get_type_person, axis=1)
+    dataframe["Person"] = dataframe[['Age', 'Sex']].apply(get_type_person, axis=1)
     
     # we want to know who is a mother and who is not
-    def get_mother(passenger):
-        age, sex, kids, title = passenger
-    
-        if age > 18 and sex == 1 and kids > 0 and title != 2:
-            return 1
-        else: return 0
-    
-    dataframe["Mother"] = dataframe[['Age', 'Sex', 'Parch', 'Title']].apply(get_mother, axis=1)
+    # doesn't give a beter result using this feature
+    #dataframe["Mother"] = dataframe[['Age', 'Sex', 'Parch', 'Title']].apply(get_mother, axis=1)
+    #def get_mother(passenger):
+    #    age, sex, kids, title = passenger
+    # 
+    #    if age > 18 and sex == 1 and kids > 0 and title != 2:
+    #        return 1
+    #    else: return 0
+    #
 
     # scaling seems interesting but don't seem to yield good results
     # for tree based methods
@@ -244,14 +246,13 @@ titanic_clean_data(test)
 
 titanic.to_csv("train_master_age.csv", index=False)
 
-predictors = ["Pclass", "Person", "Title","Fare", "Embarked", "FamilyId"]
+predictors = ["Pclass", "Person", "Title","Fare", "Embarked", "FamilyId", "Age", "FamilySize"]
 
-algorithms = [
-     [GradientBoostingClassifier(random_state=1, n_estimators=35, max_depth=3), ["Pclass", "Person", "Title", "Fare", "Embarked", "FamilyId", "FamilySize"]] 
-    ,[RandomForestClassifier(random_state=1, n_estimators=150, min_samples_split=4, min_samples_leaf=3), ["Pclass", "Person", "Title", "Fare", "Embarked", "FamilyId", "FamilySize"]]
-    #,[SVC(probability=True), ["Pclass", "Person", "Title","Fare", "Embarked", "FamilyId", "FamilySize"]] 
-    #,[LogisticRegression(random_state=1), ["Pclass", "Person", "Fare", "Title"]]
-]
+algorithms = []
+algorithms.append([GradientBoostingClassifier(random_state=1, n_estimators=35, max_depth=3), ["Pclass", "Person", "Title", "Fare", "Embarked", "FamilyId", "FamilySize"]])
+algorithms.append([RandomForestClassifier(random_state=1, n_estimators=150, min_samples_split=4, min_samples_leaf=3), ["Pclass", "Person", "Title", "Fare", "Embarked", "FamilyId", "FamilySize"]])
+#algorithms.append([SVC(probability=True), ["Pclass", "Person", "Title","Fare", "Embarked", "FamilyId", "FamilySize"]])
+#algorithms.append([LogisticRegression(random_state=1), ["Pclass", "Person", "Fare", "Title"]]) 
 
 score_ensemble(algorithms, titanic, titanic["Survived"])
 

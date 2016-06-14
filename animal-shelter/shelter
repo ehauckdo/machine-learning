@@ -1,2 +1,57 @@
 #! /usr/bin/env python
+import pandas
+import math
 
+def clean_data(dataframe):
+    dataframe.loc[dataframe["AnimalType"] == "Dog", "AnimalType"] = 0
+    dataframe.loc[dataframe["AnimalType"] == "Cat", "AnimalType"] = 1
+
+    # most occurred value, we can probably improve this later
+    dataframe["SexuponOutcome"] = dataframe["SexuponOutcome"].fillna("Neutered Male")
+
+    dataframe.loc[dataframe["SexuponOutcome"] == "Neutered Male", "SexuponOutcome"] = 0
+    dataframe.loc[dataframe["SexuponOutcome"] == "Spayed Female", "SexuponOutcome"] = 1
+    dataframe.loc[dataframe["SexuponOutcome"] == "Intact Male", "SexuponOutcome"] = 2
+    dataframe.loc[dataframe["SexuponOutcome"] == "Intact Female", "SexuponOutcome"] = 3
+    dataframe.loc[dataframe["SexuponOutcome"] == "Unknown", "SexuponOutcome"] = 4
+
+    #terrible hack, improve this later
+    def get_age(animal):
+        aid, sex, age = animal
+        try:
+            if 'week' in age or 'month' in age:
+                return 0
+            else:
+                return age.split()[0]
+        except:
+            return -1
+
+    dataframe["AgeuponOutcome"] = dataframe[['AnimalID', 'SexuponOutcome', 'AgeuponOutcome']].apply(get_age, axis=1)
+
+    # incomplete
+    breed_mapping = {}
+    def get_breed(breed):
+        if breed not in breed_mapping:
+            if len(breed_mapping) == 0:
+                current_id = 1
+            else:
+                current_id = (max(breed_mapping.items(), key=operator.itemgetter(1))[1]+1)
+            breed_mapping[breed] = current_id
+        return breed_mapping[breed]    
+
+    
+
+shelter = pandas.read_csv("train.csv")
+test = pandas.read_csv("test.csv")
+
+#print(shelter.info())
+#print("-------------------")
+#print(test.info())
+
+clean_data(shelter)
+#clean_data(test)
+
+#print(shelter["SexuponOutcome"].unique())
+#print(test["SexuponOutcome"].unique())
+#print(shelter["SexuponOutcome"].value_counts())
+#print(test["SexuponOutcome"].value_counts())

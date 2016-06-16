@@ -2,19 +2,42 @@
 import pandas
 import math
 import operator
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn import cross_validation
 
-def perform_random_forest(train_set, train_target, test_set, predictors, estimators=178, splits=6, leafs=4):
+outcomes = { "Adoption": 0, "Died": 1, "Euthanasia": 2,
+    "Return_to_owner":3, "Transfer": 4}
+def get_outcome_probability(id_animal, outcome_type):
+    return predictions[id_animal-1][outcomes[outcome_type]]
+
+def generate_submission(dataframe):
+    submission = pandas.DataFrame({
+        "ID": dataframe["ID"],
+        "Adoption": dataframe["Adoption"],
+        "Died": dataframe["Died"],
+        "Euthanasia": dataframe["Euthanasia"],
+        "Return_to_owner": dataframe["Return_to_owner"],
+        "Transfer": dataframe["Transfer"]
+    })
+    
+    submission = submission[["ID", "Adoption", "Died", "Euthanasia", "Return_to_owner", "Transfer"]]
+    submission.to_csv("kaggle.csv", index=False)
+
+def perform_random_forest_proba(train_set, train_target, test_set, predictors, estimators=178, splits=6, leafs=4):
     alg = RandomForestClassifier(random_state=1, n_estimators=estimators, min_samples_split=splits, min_samples_leaf=leafs)
     alg.fit(train_set[predictors], train_target)
-    predictions = alg.predict(test_set[predictors])
-    scores = cross_validation.cross_val_score(alg, train_set[predictors], train_target, cv=3)
-    print("RF scores: "+str(scores.mean()))
-    return predictions;
-
+    predictions = alg.predict_proba(test_set[predictors].astype(float))
+    #scores = cross_validation.cross_val_score(alg, train_set[predictors], train_target, cv=3)
+    #print("RF scores: "+str(scores.mean()))
+    return predictions
 
 def clean_data(dataframe):
     dataframe.loc[dataframe["AnimalType"] == "Dog", "AnimalType"] = 0
     dataframe.loc[dataframe["AnimalType"] == "Cat", "AnimalType"] = 1
+
+    dataframe["AnimalType"] = dataframe["AnimalType"].astype(int)
+
 
     # most occurred value, we can probably improve this later
     dataframe["SexuponOutcome"] = dataframe["SexuponOutcome"].fillna("Neutered Male")
@@ -24,16 +47,20 @@ def clean_data(dataframe):
     dataframe.loc[dataframe["SexuponOutcome"] == "Intact Male", "SexuponOutcome"] = 2
     dataframe.loc[dataframe["SexuponOutcome"] == "Intact Female", "SexuponOutcome"] = 3
     dataframe.loc[dataframe["SexuponOutcome"] == "Unknown", "SexuponOutcome"] = 4
-    
-    dataframe.loc[dataframe["OutcomeType"] == "Transfer", "OutcomeType"] = 0
-    dataframe.loc[dataframe["OutcomeType"] == "Adoption", "OutcomeType"] = 1
-    dataframe.loc[dataframe["OutcomeType"] == "Return_to_owner", "OutcomeType"] = 2
-    dataframe.loc[dataframe["OutcomeType"] == "Euthanasia", "OutcomeType"] = 3
-    dataframe.loc[dataframe["OutcomeType"] == "Died", "OutcomeType"] = 4 
+   
+    try: 
+        dataframe.loc[dataframe["OutcomeType"] == "Adoption", "OutcomeType"] = 0 
+        dataframe.loc[dataframe["OutcomeType"] == "Died", "OutcomeType"] = 1
+        dataframe.loc[dataframe["OutcomeType"] == "Euthanasia", "OutcomeType"] = 2
+        dataframe.loc[dataframe["OutcomeType"] == "Return_to_owner", "OutcomeType"] = 3
+        dataframe.loc[dataframe["OutcomeType"] == "Transfer", "OutcomeType"] = 4 
+        dataframe["OutcomeType"] = dataframe["OutcomeType"].astype(int)
+    except:
+        pass
 
     #terrible hack, improve this later
     def get_age(animal):
-        aid, sex, age = animal
+        age = animal
         try:
             if 'week' in age or 'month' in age:
                 return 0
@@ -42,7 +69,7 @@ def clean_data(dataframe):
         except:
             return -1
 
-    dataframe["AgeuponOutcome"] = dataframe[['AnimalID', 'SexuponOutcome', 'AgeuponOutcome']].apply(get_age, axis=1)
+    dataframe["AgeuponOutcome"] = dataframe[['AgeuponOutcome']].apply(get_age, axis=1)
 
     # can be improved, but works
     breed_mapping = {}
@@ -60,7 +87,7 @@ def clean_data(dataframe):
 
     dataframe.apply(get_breed, axis=1)
     dataframe['Breed'] = dataframe.apply(apply_breed, axis=1)
-    dataframe.loc[dataframe["Breed"] < 50, "Breed"] = 1
+    dataframe.loc[dataframe["Breed"] < 100, "Breed"] = 1
 
     # can be improved, but works
     color_mapping = {} 
@@ -78,7 +105,8 @@ def clean_data(dataframe):
 
     dataframe.apply(get_color, axis=1)
     dataframe['Color'] = dataframe.apply(apply_color, axis=1)
-    dataframe.loc[dataframe["Color"] < 10, "Color"] = 1
+    dataframe.loc[dataframe["Color"] < 100, "Color"] = 1
+
 
 shelter = pandas.read_csv("train.csv")
 test = pandas.read_csv("test.csv")
@@ -88,11 +116,21 @@ test = pandas.read_csv("test.csv")
 #print(test.info())
 
 clean_data(shelter)
-#clean_data(test)
+clean_data(test)
 
 #print(shelter["SexuponOutcome"].unique())
 #print(test["SexuponOutcome"].unique())
-print(shelter["Color"].value_counts())
+#print(shelter["Color"].value_counts())
 #print(test["SexuponOutcome"].value_counts())
 
-shelter.to_csv("testing.csv", index=False)
+predictions = perform_random_forest_proba(shelter, shelter["OutcomeType"], test, ["AnimalType", "SexuponOutcome", "Breed", "Color"])
+
+test["Adoption"] = test[["ID"]].apply(get_outcome_probability, axis=1, args=["Adoption"])
+test["Died"] = test[["ID"]].apply(get_outcome_probability, axis=1, args=["Died"])
+test["Euthanasia"] = test[["ID"]].apply(get_outcome_probability, axis=1, args=["Euthanasia"])
+test["Return_to_owner"] = test[["ID"]].apply(get_outcome_probability, axis=1, args=["Return_to_owner"])
+test["Transfer"] = test[["ID"]].apply(get_outcome_probability, axis=1, args=["Transfer"])
+
+#shelter.to_csv("testing.csv", index=False)
+test.to_csv("testing2.csv", index=False)
+generate_submission(test)

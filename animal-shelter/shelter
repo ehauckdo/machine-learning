@@ -28,26 +28,27 @@ def perform_random_forest_proba(train_set, train_target, test_set, predictors, e
     alg = RandomForestClassifier(random_state=1, n_estimators=estimators, min_samples_split=splits, min_samples_leaf=leafs)
     alg.fit(train_set[predictors], train_target)
     predictions = alg.predict_proba(test_set[predictors].astype(float))
-    #scores = cross_validation.cross_val_score(alg, train_set[predictors], train_target, cv=3)
-    #print("RF scores: "+str(scores.mean()))
     return predictions
 
 def clean_data(dataframe):
+
+    # formatting AnimalType column
     dataframe.loc[dataframe["AnimalType"] == "Dog", "AnimalType"] = 0
     dataframe.loc[dataframe["AnimalType"] == "Cat", "AnimalType"] = 1
 
-    dataframe["AnimalType"] = dataframe["AnimalType"].astype(int)
-
-
-    # most occurred value, we can probably improve this later
+    # filling SexuponOutcome column
+    # we are filling with the most common result
     dataframe["SexuponOutcome"] = dataframe["SexuponOutcome"].fillna("Neutered Male")
 
+    # formatting SexuponOutcome column
     dataframe.loc[dataframe["SexuponOutcome"] == "Neutered Male", "SexuponOutcome"] = 0
     dataframe.loc[dataframe["SexuponOutcome"] == "Spayed Female", "SexuponOutcome"] = 1
     dataframe.loc[dataframe["SexuponOutcome"] == "Intact Male", "SexuponOutcome"] = 2
     dataframe.loc[dataframe["SexuponOutcome"] == "Intact Female", "SexuponOutcome"] = 3
     dataframe.loc[dataframe["SexuponOutcome"] == "Unknown", "SexuponOutcome"] = 4
    
+    # formatting OutcomeType column
+    # only for training set
     try: 
         dataframe.loc[dataframe["OutcomeType"] == "Adoption", "OutcomeType"] = 0 
         dataframe.loc[dataframe["OutcomeType"] == "Died", "OutcomeType"] = 1
@@ -58,19 +59,27 @@ def clean_data(dataframe):
     except:
         pass
 
-    #terrible hack, improve this later
+    # filling AgeuponOutcome column
+    # we are considering that an animal with missing age has 0 years
+    dataframe["AgeuponOutcome"] = dataframe["AgeuponOutcome"].fillna(0)
+   
+    # formatting AgeuponOutcome column
+    # terrible hack, improve this later
     def get_age(animal):
-        age = animal
+        age = str(animal["AgeuponOutcome"])
         try:
-            if 'week' in age or 'month' in age:
+            if 'week' in age:
+                return -1
+            elif 'month' in age:
                 return 0
             else:
                 return age.split()[0]
         except:
             return -1
 
-    dataframe["AgeuponOutcome"] = dataframe[['AgeuponOutcome']].apply(get_age, axis=1)
+    dataframe["AgeuponOutcome"] = dataframe.apply(get_age, axis=1)
 
+    # formatting Breed column
     # can be improved, but works
     breed_mapping = {}
     def get_breed(animal):
@@ -89,6 +98,7 @@ def clean_data(dataframe):
     dataframe['Breed'] = dataframe.apply(apply_breed, axis=1)
     dataframe.loc[dataframe["Breed"] < 100, "Breed"] = 1
 
+    # formatting Color column
     # can be improved, but works
     color_mapping = {} 
     def get_color(animal):
@@ -123,7 +133,7 @@ clean_data(test)
 #print(shelter["Color"].value_counts())
 #print(test["SexuponOutcome"].value_counts())
 
-predictions = perform_random_forest_proba(shelter, shelter["OutcomeType"], test, ["AnimalType", "SexuponOutcome", "Breed", "Color"])
+predictions = perform_random_forest_proba(shelter, shelter["OutcomeType"], test, ["AnimalType", "SexuponOutcome", "AgeuponOutcome", "Breed", "Color"])
 
 test["Adoption"] = test[["ID"]].apply(get_outcome_probability, axis=1, args=["Adoption"])
 test["Died"] = test[["ID"]].apply(get_outcome_probability, axis=1, args=["Died"])
@@ -131,6 +141,6 @@ test["Euthanasia"] = test[["ID"]].apply(get_outcome_probability, axis=1, args=["
 test["Return_to_owner"] = test[["ID"]].apply(get_outcome_probability, axis=1, args=["Return_to_owner"])
 test["Transfer"] = test[["ID"]].apply(get_outcome_probability, axis=1, args=["Transfer"])
 
-#shelter.to_csv("testing.csv", index=False)
-test.to_csv("testing2.csv", index=False)
+shelter.to_csv("train_cleaned.csv", index=False)
+test.to_csv("test_cleaned.csv", index=False)
 generate_submission(test)

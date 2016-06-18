@@ -30,6 +30,25 @@ def perform_random_forest_proba(train_set, train_target, test_set, predictors, e
     predictions = alg.predict_proba(test_set[predictors].astype(float))
     return predictions
 
+def perform_gradient_boosting_proba(train_set, train_target, test_set, predictors, estimators=30, depth=3):
+    alg = GradientBoostingClassifier(random_state=1, n_estimators=estimators, max_depth=depth)
+    alg.fit(train_set[predictors], train_target)
+    predictions = alg.predict_proba(test_set[predictors].astype(float))
+    return predictions;
+
+def perform_ensemble(algorithms, train_set, train_target, test_set):
+    total_predictions = []
+    for algorithm, predictor in algorithms:
+
+        algorithm.fit(train_set[predictor], train_target)
+        prediction = algorithm.predict_proba(test_set[predictor].astype(float))
+        total_predictions.append(prediction)
+
+    # average scores 
+    predictions = (total_predictions[0]*1  + total_predictions[1]*1)/ 2
+
+    return predictions
+
 def clean_data(dataframe):
 
     # formatting AnimalType column
@@ -69,15 +88,20 @@ def clean_data(dataframe):
         age = str(animal["AgeuponOutcome"])
         try:
             if 'week' in age:
-                return -1
-            elif 'month' in age:
                 return 0
+            elif 'month' in age:
+                value = int(age.split()[0])*(-1)
+                if value < -6:
+                    return -6
+                return value
             else:
                 return age.split()[0]
         except:
             return -1
 
     dataframe["AgeuponOutcome"] = dataframe.apply(get_age, axis=1)
+    dataframe["AgeuponOutcome"] = dataframe["AgeuponOutcome"].astype(int)
+    
 
     # formatting Breed column
     # can be improved, but works
@@ -133,7 +157,8 @@ clean_data(test)
 #print(shelter["Color"].value_counts())
 #print(test["SexuponOutcome"].value_counts())
 
-predictions = perform_random_forest_proba(shelter, shelter["OutcomeType"], test, ["AnimalType", "SexuponOutcome", "AgeuponOutcome", "Breed", "Color"])
+#predictions = perform_random_forest_proba(shelter, shelter["OutcomeType"], test, ["AnimalType", "SexuponOutcome", "AgeuponOutcome", "Breed", "Color"])
+predictions = perform_gradient_boosting_proba(shelter, shelter["OutcomeType"], test, ["AnimalType", "SexuponOutcome", "AgeuponOutcome", "Breed", "Color"])
 
 test["Adoption"] = test[["ID"]].apply(get_outcome_probability, axis=1, args=["Adoption"])
 test["Died"] = test[["ID"]].apply(get_outcome_probability, axis=1, args=["Died"])

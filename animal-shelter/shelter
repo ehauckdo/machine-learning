@@ -52,8 +52,11 @@ def perform_ensemble(algorithms, train_set, train_target, test_set):
         total_predictions.append(prediction)
   
     # average scores 
-    predictions = (total_predictions[0]*1  + total_predictions[1]*1)/ 2
-
+    predictions = 0;
+    for prediction in total_predictions:
+        predictions += prediction
+    predictions = predictions/len(total_predictions)
+    
     return predictions
 
 def clean_data(dataframe):

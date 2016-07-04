@@ -13,14 +13,8 @@ from sklearn import cross_validation
 outcomes = { "Adoption": 0, "Died": 1, "Euthanasia": 2,
     "Return_to_owner":3, "Transfer": 4}
 
-def get_outcome_probability_impl1(id_animal, outcome_type):
-    return predictions[id_animal-1][outcomes[outcome_type]]
-
-def get_outcome_probability_impl2(id_animal, outcome_type):
+def get_outcome_probability(id_animal, outcome_type):
     return predictions[outcomes[outcome_type]][id_animal-1]
-
-def get_outcome_voting_result(id_animal, outcome_type):
-    return predictions[id_animal-1]
 
 def generate_submission(dataframe):
     submission = pandas.DataFrame({
@@ -53,7 +47,7 @@ def perform_gradient_boosting_proba(train_set, train_target, test_set, predictor
         print("%.2f" % i)
     return predictions;
 
-def perform_ensemble_vote_each(algorithms, train_set, train_target, test_set, use_subsets=True, random_subsets=True, subset_size=0.6):
+def perform_ensemble_vote(algorithms, train_set, train_target, test_set, use_subsets=True, subset_size=0.6):
 
     def get_outcome(animal, desired_outcome):
         outcome = animal["OutcomeType"]
@@ -62,85 +56,48 @@ def perform_ensemble_vote_each(algorithms, train_set, train_target, test_set, us
         else:
             return 0
 
-    def run_outcome(train_set, outcome, outcome_values, test_set):
+    def get_outcome_probability(train_set, outcome, train_target, test_set):
         dataframe = train_set.copy()
-        dataframe["OutcomeType"] = outcome_values
+        dataframe["OutcomeType"] = train_target 
 
         total_predictions = []
         for algorithm, predictor in (algorithms):
-            subset = dataframe.sample(frac=subset_size)
-            algorithm.fit(subset[predictor], subset["OutcomeType"])
+            if use_subsets is True:
+                subset = dataframe.sample(frac=subset_size)
+                algorithm.fit(subset[predictor], subset["OutcomeType"])
+            else:
+                algorithm.fit(train_set[predictor], subset["OutcomeType"])
             prediction = algorithm.predict(test_set[predictor].astype(float))
             total_predictions.append(prediction)
 
         predictions = 0;
         for prediction in total_predictions:
             predictions += prediction
-       
+        
         total_votes = len(algorithms)
         predictions = numpy.divide(predictions, float(total_votes)) 
-            
         return predictions
 
     outcome_column = {}
     outcome_probabilities = {}
+
     for key in outcomes.keys():
         outcome_column[key] = train_target.apply(get_outcome, axis=1, args=[outcomes[key]])
-        outcome_probabilities[outcomes[key]] = run_outcome(train_set, key, outcome_column[key], test_set)
+        outcome_probabilities[outcomes[key]] = get_outcome_probability(train_set, key, outcome_column[key], test_set)
 
     return outcome_probabilities 
-
-def perform_ensemble_vote(algorithms, train_set, train_target, test_set, use_subsets=True, subset_size=0.7):
-    
-    total_predictions = []
-    if use_subsets is True:
-        for algorithm, predictor in (algorithms):
-            subset = train_set.sample(frac=subset_size)
-            algorithm.fit(subset[predictor], subset["OutcomeType"])
-            prediction = algorithm.predict(test_set[predictor].astype(float))
-            total_predictions.append(prediction)
-    
-    else:
-        for algorithm, predictor in (algorithms):
-            algorithm.fit(train_set[predictor], train_target)
-            prediction = algorithm.predict(test_set[predictor].astype(float))
-            total_predictions.append(prediction)
- 
-    predictions = [];
-    votes = []
-    for i in range(len(test_set.index)):
-        votes.append([0,0,0,0,0])
-
-    for prediction in total_predictions:
-        for i in range(len(prediction)):
-            votes[i][prediction[i]] +=1            
-    
-    for i in range(len(votes)):
-        print(i, votes[i]) 
-        most_voted = votes[i].index(max(votes[i]))
-        print("Max:", most_voted)
-        predictions.append(most_voted)
-    
-    print("Predictions:")
-    for i in range (len(predictions)):
-        print(i, predictions[i])
-    
-    return predictions
 
 def perform_ensemble_proba(algorithms, train_set, train_target, test_set, use_subsets=True, subset_size=0.6):
 
     total_predictions = []
-    if use_subsets is True:
-        for algorithm, predictor in (algorithms):
+    for algorithm, predictor in (algorithms):
+        if use_subsets is True:
             subset = train_set.sample(frac=subset_size)
             algorithm.fit(subset[predictor], subset["OutcomeType"])
-            prediction = algorithm.predict_proba(test_set[predictor].astype(float))
-            total_predictions.append(prediction)
-    else:
-        for algorithm, predictor in (algorithms):
+        else:
             algorithm.fit(train_set[predictor], train_target)
-            prediction = algorithm.predict_proba(test_set[predictor].astype(float))
-            total_predictions.append(prediction)
+        prediction = algorithm.predict_proba(test_set[predictor].astype(float))
+        total_predictions.append(prediction)
   
     # average scores 
     predictions = 0;
@@ -274,9 +231,9 @@ clean_data(shelter)
 clean_data(test)
 
 algorithms = []
-for i in range(5):
+for i in range(10):
     algorithms.append([GradientBoostingClassifier(random_state=1, n_estimators=35, max_depth=3), ["AnimalType", "SexuponOutcome", "AgeuponOutcome", "Breed", "Color", "Identity", "Pedigree"]])
-for i in range(5):
+for i in range(10):
     algorithms.append([RandomForestClassifier(random_state=1, n_estimators=150, min_samples_split=4, min_samples_leaf=3), ["AnimalType", "SexuponOutcome", "AgeuponOutcome", "Breed", "Color", "Identity", "Pedigree"]])
 
 #print(shelter["SexuponOutcome"].unique())
@@ -286,13 +243,13 @@ for i in range(5):
 
 #predictions = perform_random_forest_proba(shelter, shelter["OutcomeType"], test, ["AnimalType", "SexuponOutcome", "AgeuponOutcome", "Breed", "Color"])
 #predictions = perform_gradient_boosting_proba(shelter, shelter["OutcomeType"], test, ["AnimalType", "SexuponOutcome", "AgeuponOutcome", "Breed", "Color"])
-predictions = perform_ensemble_vote_each(algorithms, shelter, shelter, test)
+predictions = perform_ensemble_vote(algorithms, shelter, shelter, test)
 
-test["Adoption"] = test[["ID"]].apply(get_outcome_probability_impl2, axis=1, args=["Adoption"])
-test["Died"] = test[["ID"]].apply(get_outcome_probability_impl2, axis=1, args=["Died"])
-test["Euthanasia"] = test[["ID"]].apply(get_outcome_probability_impl2, axis=1, args=["Euthanasia"])
-test["Return_to_owner"] = test[["ID"]].apply(get_outcome_probability_impl2, axis=1, args=["Return_to_owner"])
-test["Transfer"] = test[["ID"]].apply(get_outcome_probability_impl2, axis=1, args=["Transfer"])
+test["Adoption"] = test[["ID"]].apply(get_outcome_probability, axis=1, args=["Adoption"])
+test["Died"] = test[["ID"]].apply(get_outcome_probability, axis=1, args=["Died"])
+test["Euthanasia"] = test[["ID"]].apply(get_outcome_probability, axis=1, args=["Euthanasia"])
+test["Return_to_owner"] = test[["ID"]].apply(get_outcome_probability, axis=1, args=["Return_to_owner"])
+test["Transfer"] = test[["ID"]].apply(get_outcome_probability, axis=1, args=["Transfer"])
 
 
 #shelter.to_csv("train_cleaned.csv", index=False)

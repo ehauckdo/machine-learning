@@ -8,26 +8,12 @@ import numpy
 from sklearn.cross_validation import KFold
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.svm import SVC
+from sklearn.svm import SVR
 from sklearn import cross_validation
 
 outcomes = { "Adoption": 0, "Died": 1, "Euthanasia": 2,
     "Return_to_owner":3, "Transfer": 4}
-
-def get_outcome_probability(id_animal, outcome_type):
-    return predictions[outcomes[outcome_type]][id_animal-1]
-
-def generate_submission(dataframe):
-    submission = pandas.DataFrame({
-        "ID": dataframe["ID"],
-        "Adoption": dataframe["Adoption"],
-        "Died": dataframe["Died"],
-        "Euthanasia": dataframe["Euthanasia"],
-        "Return_to_owner": dataframe["Return_to_owner"],
-        "Transfer": dataframe["Transfer"]
-    })
-    
-    submission = submission[["ID", "Adoption", "Died", "Euthanasia", "Return_to_owner", "Transfer"]]
-    submission.to_csv("kaggle.csv", index=False)
 
 def perform_random_forest_proba(train_set, train_target, test_set, predictors, estimators=178, splits=6, leafs=4):
     alg = RandomForestClassifier(random_state=1, n_estimators=estimators, min_samples_split=splits, min_samples_leaf=leafs)
@@ -47,7 +33,15 @@ def perform_gradient_boosting_proba(train_set, train_target, test_set, predictor
         print("%.2f" % i)
     return predictions;
 
-def perform_ensemble_vote(algorithms, train_set, test_set, use_subsets=True, subset_size=0.6):
+def perform_SVM(train_set, train_target, test_set, predictors):
+    alg = SVC()
+    alg.fit(train_set[predictors], train_target)
+    predictions = alg.predict(test_set[predictors])
+    scores = cross_validation.cross_val_score(alg, train_set[predictors], train_target, cv=3)
+    print("SVM scores: "+str(scores.mean()))
+    return predictions
+
+def perform_ensemble_vote(algorithms, train_set, test_set, use_subsets=True, subset_size=0.8):
 
     def get_outcome(animal, desired_outcome):
         outcome = animal["OutcomeType"]
@@ -87,7 +81,7 @@ def perform_ensemble_vote(algorithms, train_set, test_set, use_subsets=True, sub
 
     return outcome_probabilities 
 
-def perform_ensemble_proba(algorithms, train_set, test_set, use_subsets=True, subset_size=0.6):
+def perform_ensemble_proba(algorithms, train_set, test_set, use_subsets=True, subset_size=0.7):
 
     total_predictions = []
     for algorithm, predictor in (algorithms):
@@ -106,6 +100,33 @@ def perform_ensemble_proba(algorithms, train_set, test_set, use_subsets=True, su
     predictions = predictions/len(total_predictions)
     
     return predictions
+
+def insert_probabilities(dataframe, predictions):
+
+    def get_outcome_probability(id_animal, outcome_type):
+        return predictions[id_animal-1][outcomes[outcome_type]]
+
+    def get_outcome_probability_vote(id_animal, outcome_type):
+        return predictions[outcomes[outcome_type]][id_animal-1]
+
+    dataframe["Adoption"] = dataframe[["ID"]].apply(get_outcome_probability, axis=1, args=["Adoption"])
+    dataframe["Died"] = dataframe[["ID"]].apply(get_outcome_probability, axis=1, args=["Died"])
+    dataframe["Euthanasia"] = dataframe[["ID"]].apply(get_outcome_probability, axis=1, args=["Euthanasia"])
+    dataframe["Return_to_owner"] = dataframe[["ID"]].apply(get_outcome_probability, axis=1, args=["Return_to_owner"])
+    dataframe["Transfer"] = dataframe[["ID"]].apply(get_outcome_probability, axis=1, args=["Transfer"])
+
+def generate_submission(dataframe):
+    submission = pandas.DataFrame({
+        "ID": dataframe["ID"],
+        "Adoption": dataframe["Adoption"],
+        "Died": dataframe["Died"],
+        "Euthanasia": dataframe["Euthanasia"],
+        "Return_to_owner": dataframe["Return_to_owner"],
+        "Transfer": dataframe["Transfer"]
+    })
+    
+    submission = submission[["ID", "Adoption", "Died", "Euthanasia", "Return_to_owner", "Transfer"]]
+    submission.to_csv("kaggle.csv", index=False)
 
 def clean_data(dataframe):
 
@@ -223,35 +244,16 @@ def clean_data(dataframe):
 shelter = pandas.read_csv("train.csv")
 test = pandas.read_csv("test.csv")
 
-#print(shelter.info())
-#print("-------------------")
-#print(test.info())
-
 clean_data(shelter)
 clean_data(test)
 
 algorithms = []
-for i in range(10):
-    algorithms.append([GradientBoostingClassifier(random_state=1, n_estimators=35, max_depth=3), ["AnimalType", "SexuponOutcome", "AgeuponOutcome", "Breed", "Color", "Identity", "Pedigree"]])
-for i in range(10):
+for i in range(1):
+    algorithms.append([GradientBoostingClassifier(random_state=1, n_estimators=35, max_depth=5), ["AnimalType", "SexuponOutcome", "AgeuponOutcome", "Breed", "Color", "Identity", "Pedigree"]])
+for i in range(1):
     algorithms.append([RandomForestClassifier(random_state=1, n_estimators=150, min_samples_split=4, min_samples_leaf=3), ["AnimalType", "SexuponOutcome", "AgeuponOutcome", "Breed", "Color", "Identity", "Pedigree"]])
 
-#print(shelter["SexuponOutcome"].unique())
-#print(test["SexuponOutcome"].unique())
-#print(shelter["Color"].value_counts())
-#print(test["SexuponOutcome"].value_counts())
+predictions = perform_ensemble_proba(algorithms, shelter, test)
+insert_probabilities(test, predictions)
 
-#predictions = perform_random_forest_proba(shelter, shelter["OutcomeType"], test, ["AnimalType", "SexuponOutcome", "AgeuponOutcome", "Breed", "Color"])
-#predictions = perform_gradient_boosting_proba(shelter, shelter["OutcomeType"], test, ["AnimalType", "SexuponOutcome", "AgeuponOutcome", "Breed", "Color"])
-predictions = perform_ensemble_vote(algorithms, shelter, test)
-
-test["Adoption"] = test[["ID"]].apply(get_outcome_probability, axis=1, args=["Adoption"])
-test["Died"] = test[["ID"]].apply(get_outcome_probability, axis=1, args=["Died"])
-test["Euthanasia"] = test[["ID"]].apply(get_outcome_probability, axis=1, args=["Euthanasia"])
-test["Return_to_owner"] = test[["ID"]].apply(get_outcome_probability, axis=1, args=["Return_to_owner"])
-test["Transfer"] = test[["ID"]].apply(get_outcome_probability, axis=1, args=["Transfer"])
-
-
-#shelter.to_csv("train_cleaned.csv", index=False)
-#test.to_csv("test_cleaned.csv", index=False)
 generate_submission(test)

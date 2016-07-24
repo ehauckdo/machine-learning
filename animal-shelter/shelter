@@ -10,6 +10,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.svm import SVC
 from sklearn.svm import SVR
+from sklearn.preprocessing import StandardScaler
 from sklearn import cross_validation
 
 outcomes = { "Adoption": 0, "Died": 1, "Euthanasia": 2,
@@ -34,12 +35,74 @@ def perform_gradient_boosting_proba(train_set, train_target, test_set, predictor
     return predictions;
 
 def perform_SVM(train_set, train_target, test_set, predictors):
-    alg = SVC()
+    alg = SVC(probability=True)
     alg.fit(train_set[predictors], train_target)
-    predictions = alg.predict(test_set[predictors])
+    scores = alg.score(train_set[predictors], train_target)
+    print("alg.score results:")
+    print(scores)
+    predictions = alg.predict_log_proba(test_set[predictors])
     scores = cross_validation.cross_val_score(alg, train_set[predictors], train_target, cv=3)
     print("SVM scores: "+str(scores.mean()))
     return predictions
+
+def perform_SVR(train_set, train_target, test_set, predictors, use_subsets=True, subset_size=0.4):
+
+    def get_outcome(animal, desired_outcome):
+        outcome = animal["OutcomeType"]
+        if outcome == desired_outcome:
+            return 1
+        else:
+            return 0
+    
+    def get_outcome_probability(train_set, outcome, train_target, test_set):
+        train_set["OutcomeType"] = train_target 
+        if use_subsets is True:
+            dataframe = train_set.sample(frac=subset_size)
+        else:
+            dataframe = train_set.copy()
+            
+
+        print("dataframe: ")
+        print(dataframe.head(5))        
+        
+        print("\ntesteset: ")
+        print(test_set.head(5))        
+        print(type(test_set))       
+ 
+        scaler = StandardScaler()
+        dataframe[predictors] = scaler.fit_transform(dataframe[predictors])
+        test_set[predictors] = scaler.transform(test_set[predictors])
+ 
+        print("\ndataframe AFTER scaling: ")
+        print(dataframe.head(5))        
+        print("\ntest set AFTER scaling: ")
+        print(test_set.head(5))        
+        #unique = []
+        #for list in dataframe:
+        #    if list[3] not in unique:
+        #        unique.append(list[3])
+        #print(unique)
+
+        svr = SVR()
+        total_predictions = []
+        
+        svr.fit(dataframe[predictors], dataframe["OutcomeType"])
+        predictions = svr.predict(test_set[predictors].astype(float))
+        print("\noutcome results: ")
+        print(outcome)
+        for i in range(10):
+            print(predictions[i])
+        print("")
+        return predictions
+    
+    outcome_column = {}
+    outcome_probabilities = {}
+
+    for key in outcomes.keys():
+        outcome_column[key] = train_set.apply(get_outcome, axis=1, args=[outcomes[key]])
+        outcome_probabilities[outcomes[key]] = get_outcome_probability(train_set[predictors], key, outcome_column[key], test_set[predictors])
+
+    return outcome_probabilities 
 
 def perform_ensemble_vote(algorithms, train_set, test_set, use_subsets=True, subset_size=0.8):
 
@@ -103,10 +166,10 @@ def perform_ensemble_proba(algorithms, train_set, test_set, use_subsets=True, su
 
 def insert_probabilities(dataframe, predictions):
 
-    def get_outcome_probability(id_animal, outcome_type):
+    def get_outcome_probability1(id_animal, outcome_type):
         return predictions[id_animal-1][outcomes[outcome_type]]
 
-    def get_outcome_probability_vote(id_animal, outcome_type):
+    def get_outcome_probability(id_animal, outcome_type):
         return predictions[outcomes[outcome_type]][id_animal-1]
 
     dataframe["Adoption"] = dataframe[["ID"]].apply(get_outcome_probability, axis=1, args=["Adoption"])
@@ -114,6 +177,18 @@ def insert_probabilities(dataframe, predictions):
     dataframe["Euthanasia"] = dataframe[["ID"]].apply(get_outcome_probability, axis=1, args=["Euthanasia"])
     dataframe["Return_to_owner"] = dataframe[["ID"]].apply(get_outcome_probability, axis=1, args=["Return_to_owner"])
     dataframe["Transfer"] = dataframe[["ID"]].apply(get_outcome_probability, axis=1, args=["Transfer"])
+
+    dataframe.loc[dataframe["Adoption"] < 0, "Adoption"] = 0.0
+    dataframe.loc[dataframe["Died"] < 0, "Died"] = 0.0
+    dataframe.loc[dataframe["Euthanasia"] < 0, "Euthanasia"] = 0.0
+    dataframe.loc[dataframe["Return_to_owner"] < 0, "Return_to_owner"] = 0.0
+    dataframe.loc[dataframe["Transfer"] < 0, "Transfer"] = 0.0
+
+    dataframe.loc[dataframe["Adoption"] > 1, "Adoption"] = 1.0
+    dataframe.loc[dataframe["Died"] > 1, "Died"] = 1.0
+    dataframe.loc[dataframe["Euthanasia"] > 1, "Euthanasia"] = 1.0
+    dataframe.loc[dataframe["Return_to_owner"] > 1, "Return_to_owner"] = 1.0
+    dataframe.loc[dataframe["Transfer"] > 1, "Transfer"] = 1.0
 
 def generate_submission(dataframe):
     submission = pandas.DataFrame({
@@ -252,8 +327,18 @@ for i in range(1):
     algorithms.append([GradientBoostingClassifier(random_state=1, n_estimators=35, max_depth=5), ["AnimalType", "SexuponOutcome", "AgeuponOutcome", "Breed", "Color", "Identity", "Pedigree"]])
 for i in range(1):
     algorithms.append([RandomForestClassifier(random_state=1, n_estimators=150, min_samples_split=4, min_samples_leaf=3), ["AnimalType", "SexuponOutcome", "AgeuponOutcome", "Breed", "Color", "Identity", "Pedigree"]])
+#for i in range(1):
+#    algorithms.append([MLPClassifier(), ["AnimalType", "SexuponOutcome", "AgeuponOutcome", "Breed", "Color", "Identity", "Pedigree"]])
 
-predictions = perform_ensemble_proba(algorithms, shelter, test)
+#predictions = perform_ensemble_proba(algorithms, shelter, test)
+#insert_probabilities(test, predictions)
+
+#generate_submission(test)
+#predictions = perform_SVM(shelter, shelter["OutcomeType"], test, ["AnimalType", "SexuponOutcome", "AgeuponOutcome", "Breed", "Color", "Identity", "Pedigree"])
+#for i in range(20):
+#    print(predictions[i])
+
+
+predictions = perform_SVR(shelter, shelter["OutcomeType"], test, ["AnimalType", "SexuponOutcome", "AgeuponOutcome"])
 insert_probabilities(test, predictions)
-
 generate_submission(test)

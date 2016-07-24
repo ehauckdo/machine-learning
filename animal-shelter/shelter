@@ -12,6 +12,10 @@ from sklearn.svm import SVC
 from sklearn.svm import SVR
 from sklearn.preprocessing import StandardScaler
 from sklearn import cross_validation
+from sklearn.grid_search import GridSearchCV
+from sklearn.cross_validation import train_test_split
+from sklearn.metrics import classification_report
+from Tools.estimators import grid_search
 
 outcomes = { "Adoption": 0, "Died": 1, "Euthanasia": 2,
     "Return_to_owner":3, "Transfer": 4}
@@ -45,7 +49,7 @@ def perform_SVM(train_set, train_target, test_set, predictors):
     print("SVM scores: "+str(scores.mean()))
     return predictions
 
-def perform_SVR(train_set, train_target, test_set, predictors, use_subsets=True, subset_size=0.4):
+def perform_SVR(train_set, train_target, test_set, predictors, use_subsets=True, subset_size=0.01):
 
     def get_outcome(animal, desired_outcome):
         outcome = animal["OutcomeType"]
@@ -61,40 +65,39 @@ def perform_SVR(train_set, train_target, test_set, predictors, use_subsets=True,
         else:
             dataframe = train_set.copy()
             
-
-        print("dataframe: ")
-        print(dataframe.head(5))        
+        #print("\ndataframe: ")
+        #print(dataframe.head(5))        
         
-        print("\ntesteset: ")
-        print(test_set.head(5))        
-        print(type(test_set))       
+        #print("\ntesteset: ")
+        #print(test_set.head(5))        
+        #print(type(test_set))       
  
-        scaler = StandardScaler()
-        dataframe[predictors] = scaler.fit_transform(dataframe[predictors])
-        test_set[predictors] = scaler.transform(test_set[predictors])
+        #scaler = StandardScaler()
+        #dataframe[predictors] = scaler.fit_transform(dataframe[predictors])
+        #test_set[predictors] = scaler.transform(test_set[predictors])
  
-        print("\ndataframe AFTER scaling: ")
-        print(dataframe.head(5))        
-        print("\ntest set AFTER scaling: ")
-        print(test_set.head(5))        
-        #unique = []
-        #for list in dataframe:
-        #    if list[3] not in unique:
-        #        unique.append(list[3])
-        #print(unique)
+        #print("\ndataframe AFTER scaling: ")
+        #print(dataframe.head(5))        
+        #print("\ntest set AFTER scaling: ")
+        #print(test_set.head(5))        
 
         svr = SVR()
-        total_predictions = []
-        
-        svr.fit(dataframe[predictors], dataframe["OutcomeType"])
-        predictions = svr.predict(test_set[predictors].astype(float))
-        print("\noutcome results: ")
+        print("\nOUTCOME:")
         print(outcome)
-        for i in range(10):
-            print(predictions[i])
-        print("")
-        return predictions
-    
+        grid_search(svr, dataframe, predictors, "OutcomeType")
+        
+
+        #svr.fit(dataframe[predictors], dataframe["OutcomeType"])
+        #predictions = svr.predict(test_set[predictors].astype(float))
+        
+        #print("\noutcome results: ")
+        #print(outcome)
+        #for i in range(10):
+        #    print(predictions[i])
+        
+        #return predictions
+        return 0    
+
     outcome_column = {}
     outcome_probabilities = {}
 

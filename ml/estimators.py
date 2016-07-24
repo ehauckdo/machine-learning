@@ -5,6 +5,8 @@ from sklearn.svm import SVC
 from sklearn import cross_validation
 from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.cross_validation import KFold
+from sklearn.grid_search import GridSearchCV
+from sklearn.cross_validation import train_test_split
 import matplotlib.pyplot as plt
 import numpy
 
@@ -101,4 +103,56 @@ def feature_selection(dataframe, predictors, target):
     plt.bar(range(len(predictors)), scores)
     plt.xticks(range(len(predictors)), predictors, rotation='vertical')
     plt.show()
+
+def grid_search(estimator, dataframe, predictors, target):
+
+    X_train, X_test, y_train, y_test = train_test_split(
+    dataframe[predictors], dataframe[target], test_size=0.5, random_state=0)
+    
+    def scorer_classifier(estimator, X, y): 
+    
+        total = X.shape[0]
+        results = estimator.predict(X)
+    
+        result = 0 
+        for i in results:
+            result += i
+        return result/total
+
+    def scorer_regression(estimator, X, y): 
+    
+        print("\nX:")
+        print(X)
+        total = X.shape[0]
+        results = estimator.predict(X)
+    
+        print("\nresults:")
+        print(results)
+        result = 0 
+        for i in results:
+            if i > 0.5:
+                result += 1
+        return result/total
+
+    tuned_parameters = [{'kernel': ['rbf'], 'gamma': [1e-3, 1e-4],
+                     'C': [1, 10, 100, 1000]},
+                    {'kernel': ['linear'], 'C': [1, 10, 100, 1000]}]
+    
+    print("\n# Tuning hyper-parameters for scorer_regression")
+    print()
+
+    clf = GridSearchCV(estimator, tuned_parameters, cv=5,
+                       scoring=scorer_regression)
+    clf.fit(X_train, y_train)
+
+    print("Best parameters set found on development set:")
+    print()
+    print(clf.best_params_)
+    print()
+    print("Grid scores on development set:")
+    print()
+    for params, mean_score, scores in clf.grid_scores_:
+        print("%0.3f (+/-%0.03f) for %r"
+              % (mean_score, scores.std() * 2, params))
+    print() 
 

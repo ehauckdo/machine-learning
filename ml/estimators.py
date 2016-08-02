@@ -27,12 +27,24 @@ def perform_random_forest(train_set, train_target, test_set, predictors, estimat
     print("RF scores: "+str(scores.mean()))
     return predictions;
 
+def perform_random_forest_proba(train_set, train_target, test_set, predictors, estimators=178, splits=6, leafs=4):
+    alg = RandomForestClassifier(random_state=1, n_estimators=estimators, min_samples_split=splits, min_samples_leaf=leafs)
+    alg.fit(train_set[predictors], train_target)
+    predictions = alg.predict_proba(test_set[predictors].astype(float))
+    return predictions
+
 def perform_gradient_boosting(train_set, train_target, test_set, predictors, estimators=30, depth=3):
     alg = GradientBoostingClassifier(random_state=1, n_estimators=estimators, max_depth=depth)
     alg.fit(train_set[predictors], train_target)
     predictions = alg.predict(test_set[predictors])
     scores = cross_validation.cross_val_score(alg, train_set[predictors], train_target, cv=3)
     print("GB scores: "+str(scores.mean()))
+    return predictions;
+
+def perform_gradient_boosting_proba(train_set, train_target, test_set, predictors, estimators=30, depth=3):
+    alg = GradientBoostingClassifier(random_state=1, n_estimators=estimators, max_depth=depth)
+    alg.fit(train_set[predictors], train_target)
+    predictions = alg.predict_proba(test_set[predictors].astype(float))
     return predictions;
 
 def perform_svm(train_set, train_target, test_set, predictors):

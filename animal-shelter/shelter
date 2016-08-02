@@ -28,34 +28,6 @@ svr_params = {
     "Euthanasia":   {'kernel': 'rbf', 'C': 1, 'gamma': 0.001}
 }
 
-def perform_random_forest_proba(train_set, train_target, test_set, predictors, estimators=178, splits=6, leafs=4):
-    alg = RandomForestClassifier(random_state=1, n_estimators=estimators, min_samples_split=splits, min_samples_leaf=leafs)
-    alg.fit(train_set[predictors], train_target)
-    predictions = alg.predict_proba(test_set[predictors].astype(float))
-    print("RF:") 
-    for i in predictions[0]:
-        print("%.2f" % i)
-    return predictions
-
-def perform_gradient_boosting_proba(train_set, train_target, test_set, predictors, estimators=30, depth=3):
-    alg = GradientBoostingClassifier(random_state=1, n_estimators=estimators, max_depth=depth)
-    alg.fit(train_set[predictors], train_target)
-    predictions = alg.predict_proba(test_set[predictors].astype(float))
-    print("GB:") 
-    for i in predictions[0]:
-        print("%.2f" % i)
-    return predictions;
-
-def perform_SVM(train_set, train_target, test_set, predictors):
-    alg = SVC(probability=True)
-    alg.fit(train_set[predictors], train_target)
-    scores = alg.score(train_set[predictors], train_target)
-    print("alg.score results:")
-    print(scores)
-    predictions = alg.predict_log_proba(test_set[predictors])
-    scores = cross_validation.cross_val_score(alg, train_set[predictors], train_target, cv=3)
-    print("SVM scores: "+str(scores.mean()))
-    return predictions
 
 def perform_SVR(train_set, train_target, test_set, predictors, use_subsets=True, subset_size=0.5):
 

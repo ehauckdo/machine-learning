@@ -20,6 +20,14 @@ from Tools.estimators import grid_search
 outcomes = { "Adoption": 0, "Died": 1, "Euthanasia": 2,
     "Return_to_owner":3, "Transfer": 4}
 
+svr_params = {
+    "Transfer":     {'kernel': 'rbf', 'C': 1000, 'gamma': 0.0001},
+    "Adoption":     {'kernel': 'linear', 'C': 1},
+    "Return_to_owner":{'kernel': 'rbf', 'C': 1000, 'gamma': 0.001},
+    "Died":         {'kernel': 'rbf', 'C': 1, 'gamma': 0.001},
+    "Euthanasia":   {'kernel': 'rbf', 'C': 1, 'gamma': 0.001}
+}
+
 def perform_random_forest_proba(train_set, train_target, test_set, predictors, estimators=178, splits=6, leafs=4):
     alg = RandomForestClassifier(random_state=1, n_estimators=estimators, min_samples_split=splits, min_samples_leaf=leafs)
     alg.fit(train_set[predictors], train_target)
@@ -49,7 +57,7 @@ def perform_SVM(train_set, train_target, test_set, predictors):
     print("SVM scores: "+str(scores.mean()))
     return predictions
 
-def perform_SVR(train_set, train_target, test_set, predictors, use_subsets=True, subset_size=0.01):
+def perform_SVR(train_set, train_target, test_set, predictors, use_subsets=True, subset_size=0.5):
 
     def get_outcome(animal, desired_outcome):
         outcome = animal["OutcomeType"]
@@ -65,38 +73,18 @@ def perform_SVR(train_set, train_target, test_set, predictors, use_subsets=True,
         else:
             dataframe = train_set.copy()
             
-        #print("\ndataframe: ")
-        #print(dataframe.head(5))        
-        
-        #print("\ntesteset: ")
-        #print(test_set.head(5))        
-        #print(type(test_set))       
- 
-        #scaler = StandardScaler()
-        #dataframe[predictors] = scaler.fit_transform(dataframe[predictors])
-        #test_set[predictors] = scaler.transform(test_set[predictors])
- 
-        #print("\ndataframe AFTER scaling: ")
-        #print(dataframe.head(5))        
-        #print("\ntest set AFTER scaling: ")
-        #print(test_set.head(5))        
+        scaler = StandardScaler()
+        dataframe[predictors] = scaler.fit_transform(dataframe[predictors])
+        test_set[predictors] = scaler.transform(test_set[predictors])
 
-        svr = SVR()
-        print("\nOUTCOME:")
-        print(outcome)
-        grid_search(svr, dataframe, predictors, "OutcomeType")
+        svr = SVR(**svr_params[outcome])
+        svr.fit(dataframe[predictors], dataframe["OutcomeType"])
+        predictions = svr.predict(test_set[predictors].astype(float))
         
-
-        #svr.fit(dataframe[predictors], dataframe["OutcomeType"])
-        #predictions = svr.predict(test_set[predictors].astype(float))
+        for i in range(10):
+            print(predictions[i])
         
-        #print("\noutcome results: ")
-        #print(outcome)
-        #for i in range(10):
-        #    print(predictions[i])
-        
-        #return predictions
-        return 0    
+        return predictions
 
     outcome_column = {}
     outcome_probabilities = {}

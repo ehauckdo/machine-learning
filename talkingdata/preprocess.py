@@ -2,7 +2,6 @@
 import pandas
 
 def translate_phone_brands(df):
-    
     df.phone_brand = df.phone_brand.map(pandas.Series(english_phone_brands_mapping), na_action='ignore')
     return df
 

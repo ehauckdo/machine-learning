@@ -7,108 +7,111 @@ import sys
 from preprocess import translate_phone_brands
 import gc
 
-# ====== Load subset of train ======
-print("Loading train set...")
+def generate_subset():
 
-train = pd.read_csv("csv/gender_age_train.csv", dtype={'device_id':np.str})
+    # ====== Load subset of train ======
+    print("Loading train set...")
 
-# get first 5 rows as a smple
-df = train.head(5)
+    train = pd.read_csv("csv/gender_age_train.csv", dtype={'device_id':np.str})
 
-# get a specific device that has many events/app_events
-extra_row =  train.iloc[[32880]]
-df = df.append(extra_row)
+    # get first 5 rows as a smple
+    df = train.head(5)
 
-# save first instance of train_subset: user + phone
-df.to_csv("output/train_subset.csv", index=False)
+    # get a specific device that has many events/app_events
+    extra_row =  train.iloc[[32880]]
+    df = df.append(extra_row)
 
-print("Done.")
+    # save first instance of train_subset: user + phone
+    df.to_csv("output/train_subset.csv", index=False)
 
-# ====== Load phone_brand and merge ======
-print("Loading and merging phone_brand_device_model.csv...")
+    print("Done.")
 
-phone_brand = pd.read_csv("csv/phone_brand_device_model.csv", dtype={'device_id':np.str})
-phone_brand = translate_phone_brands(phone_brand)
-phone_brand = phone_brand.fillna("Unkown")
+    # ====== Load phone_brand and merge ======
+    print("Loading and merging phone_brand_device_model.csv...")
 
-df = pd.merge(df,phone_brand, left_on='device_id', right_on='device_id', how='left', suffixes=['','_'])
+    phone_brand = pd.read_csv("csv/phone_brand_device_model.csv", dtype={'device_id':np.str})
+    phone_brand = phone_brand.drop_duplicates(subset=phone_brand.columns[0])
+    phone_brand = translate_phone_brands(phone_brand)
+    phone_brand = phone_brand.fillna("Unkown")
 
-df.to_csv("output/train_subset2.csv", index=False)
+    df = pd.merge(df,phone_brand, left_on='device_id', right_on='device_id', how='left', suffixes=['','_'])
 
-print("Done.")
+    df.to_csv("output/train_subset2.csv", index=False)
 
-# ====== Load events and merge ===========
-print("Loading and merging events.csv...")
+    print("Done.")
 
-events = pd.read_csv("csv/events.csv", dtype={'device_id':np.str, 'event_id':np.str})
+    # ====== Load events and merge ===========
+    print("Loading and merging events.csv...")
 
-df = pd.merge(df,events,left_on='device_id',right_on='device_id', how='left', suffixes=['','_'])
+    events = pd.read_csv("csv/events.csv", dtype={'device_id':np.str, 'event_id':np.str})
 
-# save second instance of train_subset: user + phone + events
-df.to_csv("output/train_subset3.csv", index=False)
+    df = pd.merge(df,events,left_on='device_id',right_on='device_id', how='left', suffixes=['','_'])
 
-print("Done.")
+    # save second instance of train_subset: user + phone + events
+    df.to_csv("output/train_subset3.csv", index=False)
 
-# ====== Load events and merge ===========
-print("Loading and merging app_events.csv...")
+    print("Done.")
 
-app_events=pd.read_csv('csv/app_events.csv', dtype={'event_id':np.str, 'app_id':np.str})
+    # ====== Load events and merge ===========
+    print("Loading and merging app_events.csv...")
 
-df = pd.merge(df,app_events,left_on='event_id',right_on='event_id', how='left', suffixes=['','_'])
+    app_events=pd.read_csv('csv/app_events.csv', dtype={'event_id':np.str, 'app_id':np.str})
 
-# save third instance of train_subset: user + phone + events + app_events
-df.to_csv("output/train_subset4.csv", index=False)
+    df = pd.merge(df,app_events,left_on='event_id',right_on='event_id', how='left', suffixes=['','_'])
 
-print("Done.")
+    # save third instance of train_subset: user + phone + events + app_events
+    df.to_csv("output/train_subset4.csv", index=False)
 
-# ====== Load app_labels and merge =========
-print("Loading and merging app_labels.csv...")
+    print("Done.")
 
-app_labels= pd.read_csv('csv/app_labels.csv', dtype={'label_id':np.str, 'app_id':np.str})
+    # ====== Load app_labels and merge =========
+    print("Loading and merging app_labels.csv...")
 
-df = pd.merge(df,app_labels,left_on='app_id',right_on='app_id', how='left', suffixes=['','_'])
+    app_labels= pd.read_csv('csv/app_labels.csv', dtype={'label_id':np.str, 'app_id':np.str})
 
-# save fourth instance of train_subset: user + phone + events + app_events + app_labels
-df.to_csv("output/train_subset5.csv", index=False)
+    df = pd.merge(df,app_labels,left_on='app_id',right_on='app_id', how='left', suffixes=['','_'])
 
-print("Done.")
+    # save fourth instance of train_subset: user + phone + events + app_events + app_labels
+    df.to_csv("output/train_subset5.csv", index=False)
 
-# ====== Load label_categories and merge ======
-print("Loading and merging app_categories.csv...")
+    print("Done.")
 
-label_categories = pd.read_csv('csv/label_categories.csv', dtype={'label_id':np.str, 'category':np.str})
-label_categories = label_categories.fillna("unkown")
+    # ====== Load label_categories and merge ======
+    print("Loading and merging app_categories.csv...")
 
-df = pd.merge(df,label_categories,left_on='label_id',right_on='label_id', how='left', suffixes=['','_'])
+    label_categories = pd.read_csv('csv/label_categories.csv', dtype={'label_id':np.str, 'category':np.str})
+    label_categories = label_categories.fillna("unkown")
 
-# save fifth instance of train_subset: user + phone + events + app_events + app_labels
-df.to_csv("output/train_subset6.csv", index=False)
+    df = pd.merge(df,label_categories,left_on='label_id',right_on='label_id', how='left', suffixes=['','_'])
 
-print("Done.")
+    # save fifth instance of train_subset: user + phone + events + app_events + app_labels
+    df.to_csv("output/train_subset6.csv", index=False)
 
-# ====== Print report ======
+    print("Done.")
 
-print("\nFinal shape:")
-unique_devices = [x for x in df["device_id"].unique() if str(x) != 'nan']
-print("Unique devices: {0}.".format(len(unique_devices)))
-unique_events = [x for x in df["event_id"].unique() if str(x) != 'nan']
-print("Unique events: {0}.".format(len(unique_events)))
-unique_app_events = [x for x in df["app_id"].unique() if str(x) != 'nan']
-print("Unique apps: {0}.\n".format(len(unique_app_events)))
+    # ====== Print report ======
 
-list_unique_devices = df['device_id'].unique()
-if False:
-    for device in list_unique_devices:
-        print("Device ID: {0}:".format(device))
-        events = df.loc[df['device_id'] == device]
-        unique_events = [x for x in events["event_id"].unique() if str(x) != 'nan']
-        print("Total events: {0}.".format(len(unique_events)))
-        if unique_events:
-            unique_app_events = [x for x in events["app_id"].unique() if str(x) != 'nan']
-            print("Total app_events: {0}.".format(len(unique_app_events)))
-            unique_categories = [x for x in events["label_id"].unique() if str(x) != 'nan']
-            print("Total categories: {0}.".format(len(unique_categories)))
-        print("")
+    print("\nFinal shape:")
+    unique_devices = [x for x in df["device_id"].unique() if str(x) != 'nan']
+    print("Unique devices: {0}.".format(len(unique_devices)))
+    unique_events = [x for x in df["event_id"].unique() if str(x) != 'nan']
+    print("Unique events: {0}.".format(len(unique_events)))
+    unique_app_events = [x for x in df["app_id"].unique() if str(x) != 'nan']
+    print("Unique apps: {0}.\n".format(len(unique_app_events)))
+
+    list_unique_devices = df['device_id'].unique()
+    if False:
+        for device in list_unique_devices:
+            print("Device ID: {0}:".format(device))
+            events = df.loc[df['device_id'] == device]
+            unique_events = [x for x in events["event_id"].unique() if str(x) != 'nan']
+            print("Total events: {0}.".format(len(unique_events)))
+            if unique_events:
+                unique_app_events = [x for x in events["app_id"].unique() if str(x) != 'nan']
+                print("Total app_events: {0}.".format(len(unique_app_events)))
+                unique_categories = [x for x in events["label_id"].unique() if str(x) != 'nan']
+                print("Total categories: {0}.".format(len(unique_categories)))
+            print("")
     
-
+    return df
 

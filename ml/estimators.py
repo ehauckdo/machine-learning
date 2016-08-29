@@ -10,50 +10,57 @@ from sklearn.cross_validation import train_test_split
 import matplotlib.pyplot as plt
 import numpy
 
+def score(alg, train_set, predictors, train_target, title="", cv=3):
+    scores = cross_validation.cross_val_score(alg, train_set[predictors], train_target, cv=3)
+    print("{0} scores: {1}".format(title, str(scores.mean())))
+    print(scores)
+
+def score_logloss(alg, train_set, predictors, train_target, title="", cv=3):
+    scores = cross_validation.cross_val_score(alg, train_set[predictors], train_target, cv=3, scoring='log_loss')
+    print("{0} log_loss scores: {1}".format(title, str(numpy.var(scores))))
+    print(scores)
 
 def perform_logistic_regression(train_set, train_target, test_set, predictors):
     alg = LogisticRegression(random_state=1)
     alg.fit(train_set[predictors], train_target)
     predictions = alg.predict(test_set[predictors])
-    scores = cross_validation.cross_val_score(alg, train_set[predictors], train_target, cv=3)
-    print("LR scores: "+str(scores.mean()))
+    score(alg, train_set, predictors, train_target, "LR")
     return predictions
 
 def perform_random_forest(train_set, train_target, test_set, predictors, estimators=178, splits=6, leafs=4):
     alg = RandomForestClassifier(random_state=1, n_estimators=estimators, min_samples_split=splits, min_samples_leaf=leafs)
     alg.fit(train_set[predictors], train_target)
     predictions = alg.predict(test_set[predictors])
-    scores = cross_validation.cross_val_score(alg, train_set[predictors], train_target, cv=3)
-    print("RF scores: "+str(scores.mean()))
+    score(alg, train_set, predictors, train_target, "RF")
     return predictions;
-
-def perform_random_forest_proba(train_set, train_target, test_set, predictors, estimators=178, splits=6, leafs=4):
-    alg = RandomForestClassifier(random_state=1, n_estimators=estimators, min_samples_split=splits, min_samples_leaf=leafs)
-    alg.fit(train_set[predictors], train_target)
-    predictions = alg.predict_proba(test_set[predictors].astype(float))
-    return predictions
 
 def perform_gradient_boosting(train_set, train_target, test_set, predictors, estimators=30, depth=3):
     alg = GradientBoostingClassifier(random_state=1, n_estimators=estimators, max_depth=depth)
     alg.fit(train_set[predictors], train_target)
     predictions = alg.predict(test_set[predictors])
-    scores = cross_validation.cross_val_score(alg, train_set[predictors], train_target, cv=3)
-    print("GB scores: "+str(scores.mean()))
-    return predictions;
-
-def perform_gradient_boosting_proba(train_set, train_target, test_set, predictors, estimators=30, depth=3):
-    alg = GradientBoostingClassifier(random_state=1, n_estimators=estimators, max_depth=depth)
-    alg.fit(train_set[predictors], train_target)
-    predictions = alg.predict_proba(test_set[predictors].astype(float))
+    score(alg, train_set, predictors, train_target, "GB")
     return predictions;
 
 def perform_svm(train_set, train_target, test_set, predictors):
     alg = SVC()
     alg.fit(train_set[predictors], train_target)
     predictions = alg.predict(test_set[predictors])
-    scores = cross_validation.cross_val_score(alg, train_set[predictors], train_target, cv=3)
-    print("SVM scores: "+str(scores.mean()))
+    score(alg, train_set, predictors, train_target, "SVM")
     return predictions
+
+def perform_random_forest_proba(train_set, train_target, test_set, predictors, estimators=178, splits=6, leafs=4):
+    alg = RandomForestClassifier(random_state=1, n_estimators=estimators, min_samples_split=splits, min_samples_leaf=leafs)
+    alg.fit(train_set[predictors], train_target)
+    predictions = alg.predict_proba(test_set[predictors].astype(float))
+    score_logloss(alg, train_set, predictors, train_target, "RF")
+    return predictions
+
+def perform_gradient_boosting_proba(train_set, train_target, test_set, predictors, estimators=30, depth=3):
+    alg = GradientBoostingClassifier(random_state=1, n_estimators=estimators, max_depth=depth)
+    alg.fit(train_set[predictors], train_target)
+    predictions = alg.predict_proba(test_set[predictors].astype(float))
+    score_logloss(alg, train_set, predictors, train_target, "GB")
+    return predictions;
 
 def perform_ensemble(algorithms, train_set, train_target, test_set):
     total_predictions = []
@@ -106,7 +113,7 @@ def score_ensemble(algorithms, train_set, train_target):
 
 # generate chart with correlation feature vs result
 def feature_selection(dataframe, predictors, target):
-    selector = SelectKBest(f_classif, k=5)
+    selector = SelectKBest(f_classif, k='al')
     selector.fit(dataframe[predictors], target)
 
     # Get the raw p-values for each feature, and transform from p-values into scores

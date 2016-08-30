@@ -6,10 +6,9 @@ import numpy as np
 import sys
 from shapely.geometry import MultiPoint
 import gc
+from sklearn.preprocessing import LabelEncoder
 
-def generate_subset():
-
-    df = load_data()
+def merge_features(df):
 
     df = merge_phone_brand(df)
 
@@ -18,20 +17,34 @@ def generate_subset():
     df = merge_device_centroid(df)
 
     #df = merge_events(df)
-
     #df = merge_app_events(df)
-
     #df = merge_app_labels(df)
-
     #df = merge_label_categories(df)
-
     #print_report(df)
 
     return df
 
-def load_data():
+def load_train(subset_size=1):
+    df = pd.read_csv("input/gender_age_train.csv", dtype={'device_id':np.str})
+    df = df.sample(frac=subset_size)
+    df = merge_features(df)
+    df = encode_features(df)
+    return df
 
-    print("Loading train set...")
+def load_test(subset_size=1):    
+    df = pd.read_csv("input/gender_age_test.csv", dtype={'device_id':np.str})
+    df = df.sample(frac=subset_size)
+    df = merge_features(df)
+    df = encode_features(df)
+    return df
+
+def encode_features(df):
+    encoder = LabelEncoder()
+    df["phone_brand"] = encoder.fit_transform(df['phone_brand'])
+    df["device_model"] = encoder.fit_transform(df['device_model'])
+    return df
+
+def generate_subset():
 
     train = pd.read_csv("input/gender_age_train.csv", dtype={'device_id':np.str})
     df = train
@@ -42,8 +55,7 @@ def load_data():
     df = df.append(extra_row)
 
     df.to_csv("output/train_subset.csv", index=False)
-
-    print("Done.")
+    df = merge_features(df)
 
     return df
 
@@ -123,26 +135,55 @@ def merge_label_categories(df):
 
 def merge_number_events(df):
 
-    events = pd.read_csv("input/events.csv", dtype={'device_id':np.str, 'event_id':np.str})
+    print("Merging number_events...")
 
+    events = pd.read_csv("input/events.csv", dtype={'device_id':np.str, 'event_id':np.str})
+    
     events['counts'] = events.groupby(['device_id'])['event_id'].transform('count')
 
     events_small = events[['device_id', 'counts']].drop_duplicates('device_id', keep='first')
 
     df = pd.merge(df, events_small, how='left', on='device_id', left_index=True)
     df['counts'].fillna(0, inplace=True)
+    df['counts'] = df['counts'].astype(int)
+
+    print("Done.")
 
     return df
 
+def merge_installed_active_apps(df):
+    
+    ape = pd.read_csv("input/app_events.csv", dtype={'event_id':np.str})
+    ape['installed'] = ape.groupby(['event_id'])['is_installed'].transform('sum')
+    ape['active'] = ape.groupby(['event_id'])['is_active'].transform('sum')
+    ape.drop(['is_installed', 'is_active'], axis=1, inplace=True)
+    ape.drop_duplicates('event_id', keep='first', inplace=True)
+    ape.drop(['app_id'], axis=1, inplace=True)
+
+    events = pd.read_csv("input/events.csv", dtype={'device_id':np.str, 'event_id':np.str})
+    events.drop(['timestamp', 'longitude', 'latitude'], axis=1, inplace=True)
+ 
+    events = pd.merge(events, ape, how='left', on='event_id', left_index=True)
+    events.drop('event_id', axis=1, inplace=True)
+    
+    df = pd.merge(df, events, how='left', left_on='device_id', right_on='device_id', left_index=True)
+    df['installed'].fillna(0, inplace=True)
+    df['installed'] = df['installed'].astype(int)
+    df['active'].fillna(0, inplace=True)
+    df['active'] = df['active'].astype(int)
+
+    return df    
+
 def merge_device_centroid(df, coord = True):
+    
+    print("Merging device_centroid...")
 
     events = pd.read_csv("input/events.csv", dtype={'device_id':np.str, 'event_id':np.str})
 
     def get_centroid(device_id):
 
         events_device = events.loc[events['device_id'] == device_id]
-        lat_long = events_device[['longitude', 'latitude']].apply(tuple, axis=1)
-        events_device['lat_long'] = lat_long 
+        events_device['lat_long'] = events_device[['longitude', 'latitude']].apply(tuple, axis=1)
         events_device = events_device.drop_duplicates(subset=['lat_long'])
 
         lat_long_list = events_device['lat_long'].tolist()
@@ -155,19 +196,24 @@ def merge_device_centroid(df, coord = True):
             try:
                 x = points.representative_point().x
                 y = points.representative_point().y
-                return (x, y)
+                if (x, y) != (0, 0):
+                    return (x, y)
             except:
-                return 0
+                pass
         else:
             try:
                 x = round(points.representative_point().x, 0)
                 y = round(points.representative_point().y, 0)
-                return (x, y)
+                if (x, y) != (0, 0):
+                    return (x, y)
             except:
-                return 0
+                pass
+        return 0
 
     df["Centroid"] = df["device_id"].apply(get_centroid)
     
+    print("Done.")
+
     return df
 
 def print_report(df):

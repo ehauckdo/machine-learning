@@ -5,7 +5,6 @@ import pandas as pd
 import numpy as np
 import sys
 from shapely.geometry import MultiPoint
-from preprocess import translate_phone_brands
 import gc
 
 def generate_subset():
@@ -14,34 +13,34 @@ def generate_subset():
 
     df = merge_phone_brand(df)
 
-    df = merge_events(df)
+    df = merge_number_events(df)
 
-    df = merge_app_events(df)
+    df = merge_device_centroid(df)
 
-    df = merge_app_labels(df)
+    #df = merge_events(df)
 
-    df = merge_label_categories(df)
+    #df = merge_app_events(df)
 
-    print_report(df)
+    #df = merge_app_labels(df)
+
+    #df = merge_label_categories(df)
+
+    #print_report(df)
 
     return df
 
 def load_data():
 
-    # ====== Load subset of train ======
     print("Loading train set...")
 
     train = pd.read_csv("input/gender_age_train.csv", dtype={'device_id':np.str})
     df = train
 
-    # get first 5 rows as a smple
     df = train.head(5)
 
-    # get a specific device that has many events/app_events
     extra_row =  train.iloc[[32880]]
     df = df.append(extra_row)
 
-    # save first instance of train_subset: user + phone
     df.to_csv("output/train_subset.csv", index=False)
 
     print("Done.")
@@ -50,7 +49,6 @@ def load_data():
 
 def merge_phone_brand(df):
 
-    # ====== Load phone_brand and merge ======
     print("Loading and merging phone_brand_device_model.csv...")
 
     phone_brand = pd.read_csv("input/phone_brand_device_model.csv", dtype={'device_id':np.str})
@@ -68,14 +66,12 @@ def merge_phone_brand(df):
 
 def merge_events(df):
 
-    # ====== Load events and merge ===========
     print("Loading and merging events.csv...")
 
     events = pd.read_csv("input/events.csv", dtype={'device_id':np.str, 'event_id':np.str})
 
     df = pd.merge(df,events,left_on='device_id',right_on='device_id', how='left', suffixes=['','_'])
 
-    # save second instance of train_subset: user + phone + events
     df.to_csv("output/train_subset3.csv", index=False)
 
     print("Done.")
@@ -84,14 +80,12 @@ def merge_events(df):
 
 def merge_app_events(df):
 
-    # ====== Load app_events and merge ===========
     print("Loading and merging app_events.csv...")
 
     app_events=pd.read_csv('input/app_events.csv', dtype={'event_id':np.str, 'app_id':np.str})
 
     df = pd.merge(df,app_events,left_on='event_id',right_on='event_id', how='left', suffixes=['','_'])
 
-    # save third instance of train_subset: user + phone + events + app_events
     df.to_csv("output/train_subset4.csv", index=False)
 
     print("Done.")
@@ -100,22 +94,20 @@ def merge_app_events(df):
 
 def merge_app_labels(df):
 
-    # ====== Load app_labels and merge =========
     print("Loading and merging app_labels.csv...")
 
     app_labels= pd.read_csv('input/app_labels.csv', dtype={'label_id':np.str, 'app_id':np.str})
 
     df = pd.merge(df,app_labels,left_on='app_id',right_on='app_id', how='left', suffixes=['','_'])
 
-    # save fourth instance of train_subset: user + phone + events + app_events + app_labels
     df.to_csv("output/train_subset5.csv", index=False)
 
     print("Done.")
 
     return df
+
 def merge_label_categories(df):
 
-    # ====== Load label_categories and merge ======
     print("Loading and merging app_categories.csv...")
 
     label_categories = pd.read_csv('input/label_categories.csv', dtype={'label_id':np.str, 'category':np.str})
@@ -123,54 +115,62 @@ def merge_label_categories(df):
 
     df = pd.merge(df,label_categories,left_on='label_id',right_on='label_id', how='left', suffixes=['','_'])
 
-    # save fifth instance of train_subset: user + phone + events + app_events + app_labels
     df.to_csv("output/train_subset6.csv", index=False)
 
     print("Done.")
 
     return df
+
+def merge_number_events(df):
+
+    events = pd.read_csv("input/events.csv", dtype={'device_id':np.str, 'event_id':np.str})
+
+    events['counts'] = events.groupby(['device_id'])['event_id'].transform('count')
+
+    events_small = events[['device_id', 'counts']].drop_duplicates('device_id', keep='first')
+
+    df = pd.merge(df, events_small, how='left', on='device_id', left_index=True)
+    df['counts'].fillna(0, inplace=True)
+
+    return df
+
 def merge_device_centroid(df, coord = True):
-    df = df[['device_id']].drop_duplicates()
 
     events = pd.read_csv("input/events.csv", dtype={'device_id':np.str, 'event_id':np.str})
 
     def get_centroid(device_id):
 
-        print("DEVICE ID: ", device_id)
         events_device = events.loc[events['device_id'] == device_id]
-        events_device['lat_long'] = events_device[['latitude', 'longitude']].apply(tuple, axis=1)
+        lat_long = events_device[['longitude', 'latitude']].apply(tuple, axis=1)
+        events_device['lat_long'] = lat_long 
         events_device = events_device.drop_duplicates(subset=['lat_long'])
-        print("FOUND:")
-        print(events_device)
-        print("")
 
         lat_long_list = events_device['lat_long'].tolist()
         points = MultiPoint(lat_long_list)
-        print points.centroid #True centroid, not necessarily an existing point
-        print points.representative_point() #A represenative point, not centroid,
-                                    #that is guarnateed to be with the geometry
-        x = 0;
-        y = 0;
+        
+        #True centroid, not necessarily an existing point
+        #print points.centroid 
+        
         if coord:
             try:
                 x = points.representative_point().x
                 y = points.representative_point().y
+                return (x, y)
             except:
-                pass
+                return 0
         else:
             try:
                 x = round(points.representative_point().x, 0)
                 y = round(points.representative_point().y, 0)
+                return (x, y)
             except:
-                pass
-        return (x, y)
+                return 0
 
     df["Centroid"] = df["device_id"].apply(get_centroid)
-    print(df)
+    
+    return df
 
 def print_report(df):
-
-    # ====== Print report ======
 
     print("\nFinal shape:")
     unique_devices = [x for x in df["device_id"].unique() if str(x) != 'nan']
@@ -197,7 +197,7 @@ def print_report(df):
     return df
 
 def translate_phone_brands(df):
-    df.phone_brand = df.phone_brand.map(pandas.Series(english_phone_brands_mapping), na_action='ignore')
+    df.phone_brand = df.phone_brand.map(pd.Series(english_phone_brands_mapping), na_action='ignore')
     return df
 
 english_phone_brands_mapping = {

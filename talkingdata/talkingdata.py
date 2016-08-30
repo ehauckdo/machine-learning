@@ -4,31 +4,11 @@
 import pandas as pd
 import numpy as np
 import sys
-from preprocess import translate_phone_brands
 import gc
-from talkingdata import *
+from preprocess import * 
 from Tools.estimators import *
 from sklearn.preprocessing import LabelEncoder
 from shapely.geometry import MultiPoint
-
-if False:
-    df = generate_subset()
-
-    devices = df['device_id'].value_counts().keys()
-    events = []
-
-    print(devices)
-    for device in devices:
-        device_ocurrences = df.loc[df['device_id'] == device]
-        number_events = len(device_ocurrences['event_id'].value_counts())
-        events.append(number_events)
-
-    new_df = pd.DataFrame()
-    new_df['device_id'] = devices
-    new_df['number_events'] = events
-    print(new_df.head(5))
-    new_df.to_csv("output/number_events_for_device.csv", index=False)
-    #new_df.to_csv("teste.csv", index=False)
 
 #=== merges centroid ====
 

@@ -14,7 +14,9 @@ def merge_features(df):
 
     df = merge_number_events(df)
 
-    df = merge_device_centroid(df)
+    #df = merge_device_centroid(df)
+
+    #df = merge_installed_active_apps(df)
 
     #df = merge_events(df)
     #df = merge_app_events(df)
@@ -28,6 +30,7 @@ def load_train(subset_size=1):
     df = pd.read_csv("input/gender_age_train.csv", dtype={'device_id':np.str})
     df = df.sample(frac=subset_size)
     df = merge_features(df)
+    df = encode_gender(df)
     df = encode_features(df)
     return df
 
@@ -36,6 +39,25 @@ def load_test(subset_size=1):
     df = df.sample(frac=subset_size)
     df = merge_features(df)
     df = encode_features(df)
+    return df
+
+def encode_gender(df):
+    encoder = LabelEncoder()
+    df["gender"] = encoder.fit_transform(df['gender'])
+    return df
+
+def encode_gender(df):
+    encoder = LabelEncoder()
+    #print(df['group'].value_counts())
+    df["group"] = encoder.fit_transform(df['group'])
+    df.loc[df['group'] == 6, 'group'] = 0
+    df.loc[df['group'] == 7, 'group'] = 1
+    df.loc[df['group'] == 8, 'group'] = 2
+    df.loc[df['group'] == 9, 'group'] = 3
+    df.loc[df['group'] == 10, 'group'] = 4
+    df.loc[df['group'] == 11, 'group'] = 5
+    #print("")
+    #print(df['group'].value_counts())
     return df
 
 def encode_features(df):
@@ -139,13 +161,14 @@ def merge_number_events(df):
 
     events = pd.read_csv("input/events.csv", dtype={'device_id':np.str, 'event_id':np.str})
     
-    events['counts'] = events.groupby(['device_id'])['event_id'].transform('count')
+    events['number_events'] = events.groupby(['device_id'])['event_id'].transform('count')
 
-    events_small = events[['device_id', 'counts']].drop_duplicates('device_id', keep='first')
+    events_small = events[['device_id', 'number_events']].drop_duplicates('device_id', keep='first')
 
     df = pd.merge(df, events_small, how='left', on='device_id', left_index=True)
-    df['counts'].fillna(0, inplace=True)
-    df['counts'] = df['counts'].astype(int)
+    df['number_events'].fillna(0, inplace=True)
+    #df.dropna(inplace=True)
+    df['number_events'] = df['number_events'].astype(int)
 
     print("Done.")
 
@@ -164,7 +187,9 @@ def merge_installed_active_apps(df):
     events.drop(['timestamp', 'longitude', 'latitude'], axis=1, inplace=True)
  
     events = pd.merge(events, ape, how='left', on='event_id', left_index=True)
+    events.drop_duplicates('device_id', keep='first', inplace=True)
     events.drop('event_id', axis=1, inplace=True)
+    events.to_csv("output/teste.csv")
     
     df = pd.merge(df, events, how='left', left_on='device_id', right_on='device_id', left_index=True)
     df['installed'].fillna(0, inplace=True)

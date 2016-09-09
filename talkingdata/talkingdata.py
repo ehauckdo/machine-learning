@@ -15,7 +15,7 @@ def infer_gender(train, test):
     encoder = LabelEncoder()
     Y = encoder.fit_transform(train['gender'])
 
-    results = perform_gradient_boosting_proba(train, train['gender'], test, ['number_events', 'phone_brand'])
+    results = perform_gaussianNB_proba(train, train['gender'], test, ['number_events', 'phone_brand'])
     df = pd.DataFrame(results, columns=encoder.classes_)
 
     df['device_id'] = test['device_id']
@@ -29,7 +29,7 @@ def infer_age_group(train, test):
     Y = train["group"]
     Y = encoder.fit_transform(Y)
 
-    results = perform_gradient_boosting_proba(train, train['group'], test, ['number_events', 'phone_brand'])
+    results = perform_gaussianNB_proba(train, train['group'], test, ['number_events', 'phone_brand'])
     df = pd.DataFrame(results, columns=encoder.classes_)
 
     df['device_id'] = test['device_id']
@@ -50,7 +50,7 @@ def infer_age_group_male(train, test):
     test_male = test
     test_male['gender'] = 0
     
-    results = perform_gradient_boosting_proba(train_male, train_male['group'], test, ['number_events', 'phone_brand', 'gender'])
+    results = perform_gaussianNB_proba(train_male, train_male['group'], test, ['number_events', 'phone_brand', 'gender'])
     df = pd.DataFrame(results, columns=encoder.classes_)
     
     df['device_id'] = test_male['device_id']
@@ -71,7 +71,7 @@ def infer_age_group_female(train, test):
     test_female = test
     test_female['gender'] = 1 
     
-    results = perform_gradient_boosting_proba(train_female, train_female['group'], test, ['number_events', 'phone_brand', 'gender'])
+    results = perform_gaussianNB_proba(train_female, train_female['group'], test, ['number_events', 'phone_brand', 'gender'])
     df = pd.DataFrame(results, columns=encoder.classes_)
     
     df['device_id'] = test_female['device_id']
@@ -79,7 +79,7 @@ def infer_age_group_female(train, test):
     
     return df
 
-def prepare_submission_sex_age(df, device_id):
+def prepare_submission_gender_age(df, device_id):
 
     result = pd.DataFrame()
     result["device_id"] = df["device_id"]  
@@ -123,7 +123,6 @@ def prepare_submission_gender_age_separated(df, device_id):
 
     return result
    
-
 train = load_train(1)
 train.to_csv("output/train_merged.csv")
 
@@ -134,8 +133,14 @@ test = test.reset_index()
 # get feature relevance
 #feature_selection(train, ['number_events', 'phone_brand', 'device_model', 'installed', 'active'], train['group'])
 
-# perform regular random forest
-#results = perform_random_forest_proba(train, train['group'], test, ['number_events', 'phone_brand'])
+# perform regular rf/gb/etc
+#encoder = LabelEncoder()
+#Y = encoder.fit_transform(train['group'])
+#results = perform_gaussianNB_proba(train, train['group'], test, ['number_events', 'phone_brand'])
+#df = pd.DataFrame(results, columns=encoder.classes_)
+#df['device_id'] = test['device_id']
+#df = df.set_index("device_id")
+#df.to_csv('output/results.csv')
 
 # perform gender probability x age probability separately for each gender
 #df_gender = infer_gender(train, test)
@@ -154,6 +159,7 @@ df_gender = infer_gender(train, test)
 df_age = infer_age_group(train, test)
 
 df_gender = pd.merge(df_gender, df_age, how="left")
-df = prepare_submission_sex_age(df_gender, test["device_id"])
+print(df_gender.head(5))
+df = prepare_submission_gender_age(df_gender, test["device_id"])
 df.to_csv("output/results.csv")
 

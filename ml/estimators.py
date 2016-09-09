@@ -1,6 +1,7 @@
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.naive_bayes import GaussianNB
 from sklearn.svm import SVC
 from sklearn import cross_validation
 from sklearn.feature_selection import SelectKBest, f_classif
@@ -48,6 +49,13 @@ def perform_svm(train_set, train_target, test_set, predictors):
     score(alg, train_set, predictors, train_target, "SVM")
     return predictions
 
+def perform_gaussianNB(train_set, train_target, test_set, predictors):
+    alg = GaussianNB()
+    alg.fit(train_set[predictors], train_target)
+    predictions = alg.predict(test_set[predictors])
+    score(alg, train_set, predictors, train_target, "GaussianNB")
+    return predictions
+
 def perform_random_forest_proba(train_set, train_target, test_set, predictors, estimators=178, splits=6, leafs=4):
     alg = RandomForestClassifier(random_state=1, n_estimators=estimators, min_samples_split=splits, min_samples_leaf=leafs)
     alg.fit(train_set[predictors], train_target)
@@ -61,6 +69,13 @@ def perform_gradient_boosting_proba(train_set, train_target, test_set, predictor
     predictions = alg.predict_proba(test_set[predictors].astype(float))
     score_logloss(alg, train_set, predictors, train_target, "GB")
     return predictions;
+
+def perform_gaussianNB_proba(train_set, train_target, test_set, predictors):
+    alg = GaussianNB()
+    alg.fit(train_set[predictors], train_target)
+    predictions = alg.predict_proba(test_set[predictors].astype(float))
+    score_logloss(alg, train_set, predictors, train_target, "GaussianNB")
+    return predictions
 
 def perform_ensemble(algorithms, train_set, train_target, test_set):
     total_predictions = []

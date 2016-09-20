@@ -30,7 +30,7 @@ def load_train(subset_size=1):
     df = pd.read_csv("input/gender_age_train.csv", dtype={'device_id':np.str})
     df = df.sample(frac=subset_size)
     df = merge_features(df)
-    df = encode_gender(df)
+    #df = encode_gender(df)
     df = encode_features(df)
     return df
 

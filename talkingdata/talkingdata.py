@@ -143,23 +143,23 @@ test = test.reset_index()
 #df.to_csv('output/results.csv')
 
 # perform gender probability x age probability separately for each gender
-#df_gender = infer_gender(train, test)
+df_gender = infer_gender(train, test)
 
-#df_age_male = infer_age_group_male(train, test)
-#df_age_female = infer_age_group_female(train, test)
+df_age_male = infer_age_group_male(train, test)
+df_age_female = infer_age_group_female(train, test)
 
-#df = pd.merge(df_gender, df_age_male, how="left")
-#df = pd.merge(df, df_age_female, how="left")
+df = pd.merge(df_gender, df_age_male, how="left")
+df = pd.merge(df, df_age_female, how="left")
 
-#df = prepare_submission_gender_age_separated(df, df['device_id'])
-#df.to_csv("output/results.csv")
+df = prepare_submission_gender_age_separated(df, df['device_id'])
+df.to_csv("output/results.csv")
 
 # perform gender probability x age probability altogether
-df_gender = infer_gender(train, test)
-df_age = infer_age_group(train, test)
+#df_gender = infer_gender(train, test)
+#df_age = infer_age_group(train, test)
 
-df_gender = pd.merge(df_gender, df_age, how="left")
-print(df_gender.head(5))
-df = prepare_submission_gender_age(df_gender, test["device_id"])
-df.to_csv("output/results.csv")
+#df_gender = pd.merge(df_gender, df_age, how="left")
+#print(df_gender.head(5))
+#df = prepare_submission_gender_age_separated(df_gender, test["device_id"])
+#df.to_csv("output/results.csv")
 

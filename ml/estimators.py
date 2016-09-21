@@ -1,5 +1,6 @@
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble.forest import RandomForestRegressor
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.svm import SVC
@@ -77,6 +78,13 @@ def perform_gaussianNB_proba(train_set, train_target, test_set, predictors):
     score_logloss(alg, train_set, predictors, train_target, "GaussianNB")
     return predictions
 
+def perform_random_forest_regressor(train_set, train_target, test_set, predictors):
+    alg = RandomForestRegressor()
+    alg.fit(train_set[predictors], train_target)
+    predictions = alg.predict(test_set[predictors])
+    return predictions;
+
+
 def perform_ensemble(algorithms, train_set, train_target, test_set):
     total_predictions = []
     for algorithm, predictor in algorithms:
@@ -128,7 +136,7 @@ def score_ensemble(algorithms, train_set, train_target):
 
 # generate chart with correlation feature vs result
 def feature_selection(dataframe, predictors, target):
-    selector = SelectKBest(f_classif, k='al')
+    selector = SelectKBest(f_classif, k='all')
     selector.fit(dataframe[predictors], target)
 
     # Get the raw p-values for each feature, and transform from p-values into scores

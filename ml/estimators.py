@@ -2,6 +2,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble.forest import RandomForestRegressor
 from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.naive_bayes import GaussianNB
 from sklearn.svm import SVC
 from sklearn import cross_validation
@@ -84,6 +85,11 @@ def perform_random_forest_regressor(train_set, train_target, test_set, predictor
     predictions = alg.predict(test_set[predictors])
     return predictions;
 
+def perform_gradient_boosting_regressor(train_set, train_target, test_set, predictors):
+    alg = GradientBoostingRegressor(random_state=1)
+    alg.fit(train_set[predictors], train_target)
+    predictions = alg.predict(test_set[predictors])
+    return predictions;
 
 def perform_ensemble(algorithms, train_set, train_target, test_set):
     total_predictions = []

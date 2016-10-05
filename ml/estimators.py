@@ -79,14 +79,25 @@ def perform_gaussianNB_proba(train_set, train_target, test_set, predictors):
     score_logloss(alg, train_set, predictors, train_target, "GaussianNB")
     return predictions
 
-def perform_random_forest_regressor(train_set, train_target, test_set, predictors):
-    alg = RandomForestRegressor()
+def perform_random_forest_regressor(train_set, train_target, test_set, predictors, estimators=10, depth=None, splits=2):
+    alg = RandomForestRegressor(random_state=1)
     alg.fit(train_set[predictors], train_target)
+    
+    #importances = alg.feature_importances_
+    #print("Original ",numpy.argsort(importances))
+    #indices = numpy.argsort(importances)[::-1]
+    #print (" importances ",importances)
+    #print (" indices ",indices)
+    
+    #for f in range(train_set.shape[1]-2):
+    #    print("%2d) %-*s %f" % (f+1,30,predictors[indices[f]],
+    #                                    importances[indices[f]]))
+
     predictions = alg.predict(test_set[predictors])
     return predictions;
 
 def perform_gradient_boosting_regressor(train_set, train_target, test_set, predictors):
-    alg = GradientBoostingRegressor(random_state=1)
+    alg = GradientBoostingRegressor(random_state=1, n_estimators=100, max_depth=2, learning_rate=0.15)
     alg.fit(train_set[predictors], train_target)
     predictions = alg.predict(test_set[predictors])
     return predictions;
@@ -169,28 +180,34 @@ def grid_search(estimator, dataframe, predictors, target):
 
     def scorer_regression(estimator, X, y): 
     
-        print("\nX:")
-        print(X)
+        #print("\nX:")
+        #print(X)
         total = X.shape[0]
         results = estimator.predict(X)
     
-        print("\nresults:")
-        print(results)
+        #print("\nresults:")
+        #print(results)
         result = 0 
         for i in results:
             if i > 0.5:
                 result += 1
         return result/total
 
-    tuned_parameters = [{'kernel': ['rbf'], 'gamma': [1e-3, 1e-4],
+    svm_parameters = [{'kernel': ['rbf'], 'gamma': [1e-3, 1e-4],
                      'C': [1, 10, 100, 1000]},
                     {'kernel': ['linear'], 'C': [1, 10, 100, 1000]}]
-    
+   
+    tuned_parameters = {
+        'max_depth': numpy.arange(3, 10),
+        'n_estimators': numpy.arange(5, 100),
+        'min_samples_split': numpy.arange(2, 8)
+    }
+ 
     print("\n# Tuning hyper-parameters for scorer_regression")
     print()
 
-    clf = GridSearchCV(estimator, tuned_parameters, cv=5,
-                       scoring=scorer_regression)
+    clf = GridSearchCV(estimator, tuned_parameters, n_jobs=3, cv=5)
+                       #,scoring=scorer_regression) # grid search for svr
     clf.fit(X_train, y_train)
 
     print("Best parameters set found on development set:")

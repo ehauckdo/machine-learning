@@ -5,21 +5,22 @@ from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.naive_bayes import GaussianNB
 from sklearn.svm import SVC
-from sklearn import cross_validation
+from sklearn.model_selection import cross_val_score
 from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.cross_validation import KFold
 from sklearn.grid_search import GridSearchCV
 from sklearn.cross_validation import train_test_split
+import random
 import matplotlib.pyplot as plt
 import numpy
 
 def score(alg, train_set, predictors, train_target, title="", cv=3):
-    scores = cross_validation.cross_val_score(alg, train_set[predictors], train_target, cv=3)
+    scores = cross_val_score(alg, train_set[predictors], train_target, cv=3)
     print("{0} scores: {1}".format(title, str(scores.mean())))
     print(scores)
 
 def score_logloss(alg, train_set, predictors, train_target, title="", cv=3):
-    scores = cross_validation.cross_val_score(alg, train_set[predictors], train_target, cv=3, scoring='log_loss')
+    scores = cross_val_score(alg, train_set[predictors], train_target, cv=3, scoring='log_loss')
     print("{0} log_loss scores: {1}".format(title, str(numpy.var(scores))))
     print(scores)
 
@@ -116,6 +117,44 @@ def perform_ensemble(algorithms, train_set, train_target, test_set):
     predictions[predictions > .5] = 1
     predictions = predictions.astype(int)
     return predictions
+
+# This function uses the new strategy for ensembling models
+# Select only models which the CV improved the mean of previous CVs
+def perform_ensemble_incremental(algorithms, train_set, train_target, test_set, intermediary_results=10, subset_min=0.7, subset_max=0.8):
+    total_predictions = []
+    intermediary_predictions = []
+    total_scores = []
+
+    def append_predictions():
+        intermediary = numpy.mean(total_predictions, axis=0)
+        intermediary[intermediary <= .5] = 0
+        intermediary[intermediary > .5] = 1
+        intermediary = intermediary.astype(int)
+        intermediary_predictions.append([intermediary, len(total_predictions), numpy.mean(total_scores)])
+    
+    for algorithm, predictor in algorithms:
+        subset_size = random.uniform(subset_min, subset_max)
+        random_state = algorithm.get_params()["random_state"]
+        train_set["Outcome"] = train_target
+        subset = train_set.sample(frac=subset_size, random_state=random_state)
+        subset_target = subset.pop("Outcome")
+        score = numpy.sqrt(-cross_val_score(algorithm, subset[predictor], subset_target, scoring='neg_log_loss', cv=3, n_jobs=3))
+        if not total_scores or numpy.mean(score) < numpy.mean(total_scores):
+            total_scores.append(numpy.mean(score))
+            print("{0}: Mean: {1} (New score: {2}, subset_size: {3})".format(len(total_predictions), numpy.mean(total_scores), numpy.mean(score), subset_size))
+            algorithm.fit(subset[predictor], subset_target)
+            prediction = algorithm.predict_proba(test_set[predictor].astype(float))[:,1]
+            total_predictions.append(prediction)
+            if len(total_predictions) % intermediary_results is 0:
+                append_predictions()
+                #intermediary = numpy.mean(total_predictions, axis=0)
+                #intermediary[intermediary <= .5] = 0
+                #intermediary[intermediary > .5] = 1
+                #intermediary = intermediary.astype(int)
+                #intermediary_predictions.append([intermediary, len(total_predictions), numpy.mean(total_scores)])
+
+    append_predictions()
+    return intermediary_predictions
 
 # ensemble functions
 def score_ensemble(algorithms, train_set, train_target):

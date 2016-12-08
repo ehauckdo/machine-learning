@@ -5,6 +5,7 @@ import math
 import operator
 import sys
 import numpy
+import random
 from sklearn.cross_validation import KFold
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import GradientBoostingClassifier
@@ -127,12 +128,35 @@ def perform_ensemble_proba(algorithms, train_set, test_set, use_subsets=True, su
     
     return predictions
 
+def perform_ensemble_proba_incremental(algorithms, train_set, test_set, subset_size=0.8):
+
+    total_predictions = []
+    intermediary_predictions = []
+    total_scores = []
+    for algorithm, predictor in (algorithms):
+        subset_size = random.uniform(0.7, 0.9)
+        random_state = algorithm.get_params()["random_state"]
+        subset = train_set.sample(frac=subset_size, random_state=random_state)
+        score = numpy.sqrt(-cross_validation.cross_val_score(algorithm, subset[predictor], subset["OutcomeType"], scoring='neg_log_loss', cv=3, n_jobs=3))
+        if not total_scores or numpy.mean(score) < numpy.mean(total_scores):
+            total_scores.append(numpy.mean(score))
+            print("{0}: Mean: {1} (New score: {2}, subset_size: {3})".format(len(total_predictions), numpy.mean(total_scores), numpy.mean(score), subset_size))
+            algorithm.fit(subset[predictor], subset["OutcomeType"])
+            prediction = algorithm.predict_proba(test_set[predictor].astype(float))
+            total_predictions.append(prediction)
+            if len(total_predictions) % 10 is 0:
+                intermediary = numpy.mean(total_predictions, axis=0)
+                intermediary_predictions.append([intermediary, len(total_predictions), numpy.mean(total_scores)])
+    intermediary = numpy.mean(total_predictions, axis=0)
+    intermediary_predictions.append([intermediary, len(total_predictions), numpy.mean(total_scores)])
+    return intermediary_predictions 
+
 def insert_probabilities(dataframe, predictions):
 
-    def get_outcome_probability1(id_animal, outcome_type):
+    def get_outcome_probability(id_animal, outcome_type):
         return predictions[id_animal-1][outcomes[outcome_type]]
 
-    def get_outcome_probability(id_animal, outcome_type):
+    def get_outcome_probability1(id_animal, outcome_type):
         return predictions[outcomes[outcome_type]][id_animal-1]
 
     dataframe["Adoption"] = dataframe[["ID"]].apply(get_outcome_probability, axis=1, args=["Adoption"])
@@ -152,8 +176,7 @@ def insert_probabilities(dataframe, predictions):
     dataframe.loc[dataframe["Euthanasia"] > 1, "Euthanasia"] = 1.0
     dataframe.loc[dataframe["Return_to_owner"] > 1, "Return_to_owner"] = 1.0
     dataframe.loc[dataframe["Transfer"] > 1, "Transfer"] = 1.0
-
-def generate_submission(dataframe):
+    
     submission = pandas.DataFrame({
         "ID": dataframe["ID"],
         "Adoption": dataframe["Adoption"],
@@ -165,6 +188,46 @@ def generate_submission(dataframe):
     
     submission = submission[["ID", "Adoption", "Died", "Euthanasia", "Return_to_owner", "Transfer"]]
     submission.to_csv("kaggle.csv", index=False)
+
+def insert_probabilities_incremental(dataframe, all_predictions):
+
+    for predictions, num_models, score in all_predictions: 
+
+        def get_outcome_probability(id_animal, outcome_type):
+            return predictions[id_animal-1][outcomes[outcome_type]]
+
+        def get_outcome_probability1(id_animal, outcome_type):
+            return predictions[outcomes[outcome_type]][id_animal-1]
+
+        dataframe["Adoption"] = dataframe[["ID"]].apply(get_outcome_probability, axis=1, args=["Adoption"])
+        dataframe["Died"] = dataframe[["ID"]].apply(get_outcome_probability, axis=1, args=["Died"])
+        dataframe["Euthanasia"] = dataframe[["ID"]].apply(get_outcome_probability, axis=1, args=["Euthanasia"])
+        dataframe["Return_to_owner"] = dataframe[["ID"]].apply(get_outcome_probability, axis=1, args=["Return_to_owner"])
+        dataframe["Transfer"] = dataframe[["ID"]].apply(get_outcome_probability, axis=1, args=["Transfer"])
+
+        dataframe.loc[dataframe["Adoption"] < 0, "Adoption"] = 0.0
+        dataframe.loc[dataframe["Died"] < 0, "Died"] = 0.0
+        dataframe.loc[dataframe["Euthanasia"] < 0, "Euthanasia"] = 0.0
+        dataframe.loc[dataframe["Return_to_owner"] < 0, "Return_to_owner"] = 0.0
+        dataframe.loc[dataframe["Transfer"] < 0, "Transfer"] = 0.0
+
+        dataframe.loc[dataframe["Adoption"] > 1, "Adoption"] = 1.0
+        dataframe.loc[dataframe["Died"] > 1, "Died"] = 1.0
+        dataframe.loc[dataframe["Euthanasia"] > 1, "Euthanasia"] = 1.0
+        dataframe.loc[dataframe["Return_to_owner"] > 1, "Return_to_owner"] = 1.0
+        dataframe.loc[dataframe["Transfer"] > 1, "Transfer"] = 1.0
+
+        submission = pandas.DataFrame({
+            "ID": dataframe["ID"],
+            "Adoption": dataframe["Adoption"],
+            "Died": dataframe["Died"],
+            "Euthanasia": dataframe["Euthanasia"],
+            "Return_to_owner": dataframe["Return_to_owner"],
+            "Transfer": dataframe["Transfer"]
+        })
+
+        submission = submission[["ID", "Adoption", "Died", "Euthanasia", "Return_to_owner", "Transfer"]]
+        submission.to_csv("shelter07-09subset{0}gbrf{1}cv.csv".format(num_models, score), index=False)
 
 def clean_data(dataframe):
 
@@ -286,22 +349,14 @@ clean_data(shelter)
 clean_data(test)
 
 algorithms = []
-for i in range(1):
-    algorithms.append([GradientBoostingClassifier(random_state=1, n_estimators=35, max_depth=5), ["AnimalType", "SexuponOutcome", "AgeuponOutcome", "Breed", "Color", "Identity", "Pedigree"]])
-for i in range(1):
-    algorithms.append([RandomForestClassifier(random_state=1, n_estimators=150, min_samples_split=4, min_samples_leaf=3), ["AnimalType", "SexuponOutcome", "AgeuponOutcome", "Breed", "Color", "Identity", "Pedigree"]])
-#for i in range(1):
-#    algorithms.append([MLPClassifier(), ["AnimalType", "SexuponOutcome", "AgeuponOutcome", "Breed", "Color", "Identity", "Pedigree"]])
+for i in range(10000):
+    algorithms.append([GradientBoostingClassifier(random_state=i, n_estimators=35, max_depth=5), ["AnimalType", "SexuponOutcome", "AgeuponOutcome", "Breed", "Color", "Identity", "Pedigree"]])
+    algorithms.append([RandomForestClassifier(random_state=i, n_estimators=150, min_samples_split=4, min_samples_leaf=3), ["AnimalType", "SexuponOutcome", "AgeuponOutcome", "Breed", "Color", "Identity", "Pedigree"]])
 
-#predictions = perform_ensemble_proba(algorithms, shelter, test)
-#insert_probabilities(test, predictions)
-
-#generate_submission(test)
+#algorithms.append([MLPClassifier(), ["AnimalType", "SexuponOutcome", "AgeuponOutcome", "Breed", "Color", "Identity", "Pedigree"]])
 #predictions = perform_SVM(shelter, shelter["OutcomeType"], test, ["AnimalType", "SexuponOutcome", "AgeuponOutcome", "Breed", "Color", "Identity", "Pedigree"])
-#for i in range(20):
-#    print(predictions[i])
+
+predictions = perform_ensemble_proba_incremental(algorithms, shelter, test)
 
 
-predictions = perform_SVR(shelter, shelter["OutcomeType"], test, ["AnimalType", "SexuponOutcome", "AgeuponOutcome"])
-insert_probabilities(test, predictions)
-generate_submission(test)
+insert_probabilities_incremental(test, predictions)

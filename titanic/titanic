@@ -6,8 +6,9 @@ import re
 import operator
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.linear_model import LogisticRegression
 from Tools.estimators import feature_selection 
-from Tools.estimators import perform_ensemble 
+from Tools.estimators import perform_ensemble_incremental 
 from Tools.estimators import score_ensemble 
 from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import MinMaxScaler
@@ -43,6 +44,16 @@ def generate_submission(dataframe, predictions):
         "Survived": predictions
     })
     submission.to_csv("kaggle.csv", index=False)
+
+def generate_submission_incremental(dataframe, all_predictions):
+    
+    for predictions, number_models, mean_score in all_predictions:
+        submission = pandas.DataFrame({
+            "PassengerId": dataframe["PassengerId"],
+            "Survived": predictions
+        })
+        submission.to_csv("titanic07-09subset{0}models{1}cv.csv".format(number_models, mean_score), index=False)
+
 
 def titanic_clean_data(dataframe):
 
@@ -143,13 +154,14 @@ titanic.to_csv("train_master_age.csv", index=False)
 predictors = ["Pclass", "Person", "Title","Fare", "Embarked", "FamilyId", "Age", "FamilySize"]
 
 algorithms = []
-algorithms.append([GradientBoostingClassifier(random_state=1, n_estimators=35, max_depth=3), ["Pclass", "Person", "Title", "Fare", "Embarked", "FamilyId", "FamilySize"]])
-algorithms.append([RandomForestClassifier(random_state=1, n_estimators=150, min_samples_split=4, min_samples_leaf=3), ["Pclass", "Person", "Title", "Fare", "Embarked", "FamilyId", "FamilySize"]])
+for i in range(10):
+    algorithms.append([RandomForestClassifier(random_state=i, n_estimators=150, min_samples_split=4, min_samples_leaf=3), ["Pclass", "Person", "Title", "Fare", "Embarked", "FamilyId", "FamilySize"]])
+    algorithms.append([GradientBoostingClassifier(random_state=i, n_estimators=35, max_depth=3), ["Pclass", "Person", "Title", "Fare", "Embarked", "FamilyId", "FamilySize"]])
 #algorithms.append([SVC(probability=True), ["Pclass", "Person", "Title","Fare", "Embarked", "FamilyId", "FamilySize"]])
 #algorithms.append([LogisticRegression(random_state=1), ["Pclass", "Person", "Fare", "Title"]]) 
 
-score_ensemble(algorithms, titanic, titanic["Survived"])
+#score_ensemble(algorithms, titanic, titanic["Survived"])
 
 #feature_selection(titanic[predictors], titanic["Survived"])
-predictions = perform_ensemble(algorithms, titanic, titanic["Survived"], test)
-generate_submission(test, predictions)
+predictions = perform_ensemble_incremental(algorithms, titanic, titanic["Survived"], test, 4)
+generate_submission_incremental(test, predictions)

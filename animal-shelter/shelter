@@ -140,7 +140,7 @@ def perform_ensemble_proba_incremental(algorithms, train_set, test_set, subset_s
         score = numpy.sqrt(-cross_validation.cross_val_score(algorithm, subset[predictor], subset["OutcomeType"], scoring='neg_log_loss', cv=3, n_jobs=3))
         if not total_scores or numpy.mean(score) < numpy.mean(total_scores):
             total_scores.append(numpy.mean(score))
-            print("{0}: Mean: {1} (New score: {2}, subset_size: {3})".format(len(total_predictions), numpy.mean(total_scores), numpy.mean(score), subset_size))
+            print("{0}: Mean: {1} (New score: {2}, subset_size: {3}, seed: {4})".format(len(total_predictions), numpy.mean(total_scores), numpy.mean(score), subset_size, random_state))
             algorithm.fit(subset[predictor], subset["OutcomeType"])
             prediction = algorithm.predict_proba(test_set[predictor].astype(float))
             total_predictions.append(prediction)
@@ -349,7 +349,7 @@ clean_data(shelter)
 clean_data(test)
 
 algorithms = []
-for i in range(10000):
+for i in range(5):
     algorithms.append([GradientBoostingClassifier(random_state=i, n_estimators=35, max_depth=5), ["AnimalType", "SexuponOutcome", "AgeuponOutcome", "Breed", "Color", "Identity", "Pedigree"]])
     algorithms.append([RandomForestClassifier(random_state=i, n_estimators=150, min_samples_split=4, min_samples_leaf=3), ["AnimalType", "SexuponOutcome", "AgeuponOutcome", "Breed", "Color", "Identity", "Pedigree"]])
 
